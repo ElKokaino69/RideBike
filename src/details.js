@@ -435,8 +435,11 @@ export function applyDaylight() {
   document.documentElement.style.setProperty('--night', night.toFixed(2));
   // Luftbild nachts/in der Dämmerung abdunkeln und kühler färben
   if (photo && map.getLayer('base')) {
-    map.setPaintProperty('base', 'raster-brightness-max', +(0.97 - night * 0.6).toFixed(2));
-    map.setPaintProperty('base', 'raster-saturation', +(0.26 - night * 0.5).toFixed(2));
+    // Mondlicht: Gelände bleibt nachts erkennbar, nur kühler und gedämpft
+    map.setPaintProperty('base', 'raster-brightness-max', +(0.97 - night * 0.45).toFixed(2));
+    map.setPaintProperty('base', 'raster-brightness-min', +(0.02 + night * 0.03).toFixed(3));
+    map.setPaintProperty('base', 'raster-saturation', +(0.26 - night * 0.55).toFixed(2));
+    map.setPaintProperty('base', 'raster-contrast', +(0.2 + night * 0.1).toFixed(2));
   }
   return true;
 }

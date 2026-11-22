@@ -18,6 +18,10 @@ const VIEWS = [
   { n: '05-gardasee', v: { center: [10.8700, 45.8650], zoom: 12.6, pitch: 72, bearing: 190 }, s: { daylightMode: 'evening' } },
   { n: '06-eibsee-nacht', v: { center: [10.9750, 47.4500], zoom: 13.6, pitch: 70, bearing: 170 }, s: { daylightMode: 'night' } },
   { n: '07-liberty-3d', v: { center: [10.2160, 50.3220], zoom: 15.6, pitch: 66, bearing: -20 }, s: { daylightMode: 'noon', style: 'liberty' } },
+  { n: '02b-seceda', v: { center: [11.7300, 46.6000], zoom: 13.2, pitch: 76, bearing: 300 }, s: { daylightMode: 'evening' } },
+  { n: '03b-eiger', v: { center: [8.0050, 46.6100], zoom: 12.9, pitch: 74, bearing: 160 }, s: { daylightMode: 'noon' } },
+  { n: '06b-matterhorn-abend', v: { center: [7.6900, 45.9600], zoom: 12.7, pitch: 74, bearing: 250 }, s: { daylightMode: 'evening' } },
+  { n: '07b-cyclosm', v: { center: [10.2160, 50.3220], zoom: 13.8, pitch: 60, bearing: 10 }, s: { daylightMode: 'noon', style: 'cyclosm' } },
   { n: '08-bad-neustadt', v: { center: [10.2160, 50.3220], zoom: 14.8, pitch: 68, bearing: 30 }, s: { daylightMode: 'noon' } }
 ];
 
@@ -39,6 +43,8 @@ async function view(name, v, s, after) {
   const page = await browser.newPage();
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
   page.on('pageerror', (e) => console.log(name, 'PAGEERR', e.message));
+  page.on('requestfailed', (r) => { if (/brouter|photon|overpass/.test(r.url())) console.log(name, 'FAIL', r.url().slice(0, 160), r.failure()?.errorText); });
+  page.on('response', (r) => { if (/brouter|photon/.test(r.url()) && r.status() >= 400) console.log(name, 'HTTP', r.status(), r.url().slice(0, 160)); });
   await page.evaluateOnNewDocument((k, st) => localStorage.setItem(k, JSON.stringify(st)), KEY, { ...base, ...s, lastView: v });
   if (s.geo) { await browser.defaultBrowserContext().overridePermissions(BASE, ['geolocation']); await page.setGeolocation(s.geo); }
   await page.goto(BASE + '/?debug', { waitUntil: 'domcontentloaded', timeout: 120000 });
@@ -60,6 +66,7 @@ try {
       await page.click('.result:not(.wish)');
       await page.waitForFunction(() => window.__rb?.route?.data, { timeout: 90000 }).catch(() => {});
       await settle(page, 60000);
+      console.log('route', await page.evaluate(() => window.__rb?.route?.data ? Math.round(window.__rb.route.data.total) + ' m' : 'keine'));
     });
 } catch (e) { console.log('✗ route', e.message); }
 

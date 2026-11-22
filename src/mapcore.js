@@ -402,24 +402,31 @@ export function applyFov(m = map) {
  * schneidet die Kamera das Gelände an (schwarze Flächen unten). Dann sanft flacher stellen.
  */
 function guardTerrainCollision(m) {
-  let tries = 0;
+  // Kamera nie in oder direkt an Felswänden: Höhe unter der Kamera und im Blickfeld prüfen,
+  // bei Bedarf sanft herauszoomen bzw. flacher neigen (auch nachdem das Gelände nachgeladen hat)
+  let tries = 0, busy = false;
   m.on('movestart', (e) => { if (e.originalEvent) tries = 0; });
-  m.on('moveend', () => {
-    if (!m.getTerrain?.() || m.getPitch() < 45 || tries > 2) return;
-    const tr = m.transform;
-    const alt = tr?.getCameraAltitude?.() ?? (typeof tr?.cameraAltitude === 'function' ? tr.cameraAltitude() : null);
+  const check = () => {
+    if (busy || !m.getTerrain?.() || m.getPitch() < 40 || tries > 4 || m.isMoving()) return;
+    let cam, alt;
+    try { const pos = m.getFreeCameraOptions().position; cam = pos.toLngLat(); alt = pos.toAltitude(); } catch { return; }
     if (!Number.isFinite(alt)) return;
     const { clientWidth: W, clientHeight: H } = m.getContainer();
-    let maxE = -Infinity;
-    for (const fy of [0.8, 0.9, 0.99]) for (const fx of [0.05, 0.5, 0.95]) {
+    let maxE = m.queryTerrainElevation(cam) ?? -Infinity;
+    for (const fy of [0.55, 0.7, 0.85, 0.99]) for (const fx of [0.1, 0.5, 0.9]) {
       const e = m.queryTerrainElevation(m.unproject([W * fx, H * fy]));
       if (e != null && e > maxE) maxE = e;
     }
-    if (maxE > alt - 40) {
-      tries++;
-      m.easeTo({ pitch: Math.max(45, m.getPitch() - 6), zoom: m.getZoom() - 0.2, duration: 450 });
+    if (!Number.isFinite(maxE)) return;
+    const clear = Math.max(120, (alt - maxE) );
+    if (alt - maxE < 120 || clear < 0) {
+      tries++; busy = true;
+      m.easeTo({ pitch: Math.max(48, m.getPitch() - 5), zoom: m.getZoom() - 0.35, duration: 500 });
+      m.once('moveend', () => { busy = false; setTimeout(check, 60); });
     }
-  });
+  };
+  m.on('moveend', check);
+  m.on('idle', check);
 }
 
 let exTimer = 0;

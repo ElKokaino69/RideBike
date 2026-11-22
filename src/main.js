@@ -198,7 +198,7 @@ function injectIcons() {
   set('#bike-close', ICON.chevL);
   set('#btn-fly', ICON.fly);
   set('#btn-video', ICON.film || ICON.fly);
-  set('#btn-go', `${ICON.nav}<span>Navigation starten</span>`);
+  set('#btn-go', `${ICON.nav}<span>Navi starten</span>`);
   set('#nav-stop', ICON.close);
   set('#nav-recenter', ICON.navArrow);
   set('#nt-speed-ic', ICON.gauge);
