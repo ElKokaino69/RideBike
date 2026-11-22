@@ -407,12 +407,13 @@ function guardTerrainCollision(m) {
   let tries = 0, busy = false;
   m.on('movestart', (e) => { if (e.originalEvent) tries = 0; });
   const check = () => {
+    if (window.__rb) window.__rbGuardCalls = (window.__rbGuardCalls || 0) + 1;
     if (busy || !m.getTerrain?.() || m.getPitch() < 40 || tries > 4 || m.isMoving()) return;
     let cam, alt;
     try { cam = m.transform.getCameraLngLat(); alt = m.transform.getCameraAltitude(); } catch { return; }
     if (!Number.isFinite(alt)) return;
     const { clientWidth: W, clientHeight: H } = m.getContainer();
-    let maxE = m.queryTerrainElevation(cam) ?? -Infinity, looming = false;
+    let maxE = m.queryTerrainElevation(cam) ?? -Infinity, looming = false; const pts = [];
     const kmPerDeg = 111.32, cosL = Math.cos(cam.lat * Math.PI / 180);
     for (const fy of [0.4, 0.55, 0.7, 0.85, 0.99]) for (const fx of [0.1, 0.5, 0.9]) {
       const ll = m.unproject([W * fx, H * fy]);
@@ -421,8 +422,10 @@ function guardTerrainCollision(m) {
       if (e > maxE) maxE = e;
       // Felswand direkt vor der Kamera (nah und fast auf Augenhöhe) → wirkt verzerrt
       const dKm = Math.hypot((ll.lng - cam.lng) * kmPerDeg * cosL, (ll.lat - cam.lat) * kmPerDeg);
+      pts.push([fx, fy, Math.round(e), +dKm.toFixed(2)]);
       if (dKm < 1.6 && alt - e < 420) looming = true;
     }
+    if (window.__rb) window.__rbGuard = { alt: Math.round(alt), maxE: Math.round(maxE), looming, tries, near: pts };
     if (!Number.isFinite(maxE)) return;
     if (alt - maxE < 120 || looming) {
       tries++; busy = true;

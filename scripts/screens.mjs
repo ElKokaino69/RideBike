@@ -52,7 +52,7 @@ async function view(name, v, s, after) {
   if (after) await after(page);
   console.log(name, 'CAM', await page.evaluate(() => { const m = window.__rb.map; const tr = m.transform; const c = m.getCenter();
     return JSON.stringify({ alt: Math.round(tr.getCameraAltitude()), camE: m.queryTerrainElevation(tr.getCameraLngLat()), cE: m.queryTerrainElevation(c), trE: m.transform.elevation, ex: m.getTerrain()?.exaggeration,
-      pitch: m.getPitch().toFixed(1), zoom: m.getZoom().toFixed(2), rawC: m.terrain?.getElevationForLngLatZoom?.(c, m.transform.tileZoom) }); }).catch((e) => e.message));
+      pitch: m.getPitch().toFixed(1), guard: window.__rbGuard, calls: window.__rbGuardCalls, zoom: m.getZoom().toFixed(2), rawC: m.terrain?.getElevationForLngLatZoom?.(c, m.transform.tileZoom) }); }).catch((e) => e.message));
   await page.evaluate(() => { const t = document.querySelector('#trail-status'); if (t && /geladen/.test(t.textContent)) t.hidden = true; });
   await page.screenshot({ path: `${OUT}/${name}.jpg`, type: 'jpeg', quality: 86 });
   console.log('✓', name);
