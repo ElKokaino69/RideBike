@@ -50,8 +50,8 @@ async function view(name, v, s, after) {
   await page.goto(BASE + '/?debug', { waitUntil: 'domcontentloaded', timeout: 120000 });
   await settle(page);
   if (after) await after(page);
-  console.log(name, 'CAM', await page.evaluate(() => { const m = window.__rb.map; const p = m.getFreeCameraOptions().position; const c = m.getCenter();
-    return JSON.stringify({ alt: Math.round(p.toAltitude()), camE: m.queryTerrainElevation(p.toLngLat()), cE: m.queryTerrainElevation(c), trE: m.transform.elevation, ex: m.getTerrain()?.exaggeration,
+  console.log(name, 'CAM', await page.evaluate(() => { const m = window.__rb.map; const tr = m.transform; const c = m.getCenter();
+    return JSON.stringify({ alt: Math.round(tr.getCameraAltitude()), camE: m.queryTerrainElevation(tr.getCameraLngLat()), cE: m.queryTerrainElevation(c), trE: m.transform.elevation, ex: m.getTerrain()?.exaggeration,
       pitch: m.getPitch().toFixed(1), zoom: m.getZoom().toFixed(2), rawC: m.terrain?.getElevationForLngLatZoom?.(c, m.transform.tileZoom) }); }).catch((e) => e.message));
   await page.screenshot({ path: `${OUT}/${name}.jpg`, type: 'jpeg', quality: 86 });
   console.log('✓', name);

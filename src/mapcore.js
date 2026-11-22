@@ -409,7 +409,7 @@ function guardTerrainCollision(m) {
   const check = () => {
     if (busy || !m.getTerrain?.() || m.getPitch() < 40 || tries > 4 || m.isMoving()) return;
     let cam, alt;
-    try { const pos = m.getFreeCameraOptions().position; cam = pos.toLngLat(); alt = pos.toAltitude(); } catch { return; }
+    try { cam = m.transform.getCameraLngLat(); alt = m.transform.getCameraAltitude(); } catch { return; }
     if (!Number.isFinite(alt)) return;
     const { clientWidth: W, clientHeight: H } = m.getContainer();
     let maxE = m.queryTerrainElevation(cam) ?? -Infinity;
@@ -418,8 +418,7 @@ function guardTerrainCollision(m) {
       if (e != null && e > maxE) maxE = e;
     }
     if (!Number.isFinite(maxE)) return;
-    const clear = Math.max(120, (alt - maxE) );
-    if (alt - maxE < 120 || clear < 0) {
+    if (alt - maxE < 120) {
       tries++; busy = true;
       m.easeTo({ pitch: Math.max(48, m.getPitch() - 5), zoom: m.getZoom() - 0.35, duration: 500 });
       m.once('moveend', () => { busy = false; setTimeout(check, 60); });
