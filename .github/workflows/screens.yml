@@ -1,6 +1,8 @@
 name: RideBike Vorschaubilder
 on:
   workflow_dispatch:
+    inputs:
+      only: { description: 'Nur diese Ansichten (Komma)', required: false, default: '' }
 permissions:
   contents: write
 jobs:
@@ -19,7 +21,7 @@ jobs:
       - name: Echte 3D-Ansichten aufnehmen
         run: |
           sleep 5
-          node scripts/screens.mjs
+          ONLY='${{ inputs.only }}' node scripts/screens.mjs
       - name: Bilder in Branch "screens" ablegen
         run: |
           cd screens

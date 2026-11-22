@@ -50,13 +50,17 @@ async function view(name, v, s, after) {
   await page.goto(BASE + '/?debug', { waitUntil: 'domcontentloaded', timeout: 120000 });
   await settle(page);
   if (after) await after(page);
+  console.log(name, 'CAM', await page.evaluate(() => { const m = window.__rb.map; const p = m.getFreeCameraOptions().position; const c = m.getCenter();
+    return JSON.stringify({ alt: Math.round(p.toAltitude()), camE: m.queryTerrainElevation(p.toLngLat()), cE: m.queryTerrainElevation(c), trE: m.transform.elevation, ex: m.getTerrain()?.exaggeration,
+      pitch: m.getPitch().toFixed(1), zoom: m.getZoom().toFixed(2), rawC: m.terrain?.getElevationForLngLatZoom?.(c, m.transform.tileZoom) }); }).catch((e) => e.message));
   await page.screenshot({ path: `${OUT}/${name}.jpg`, type: 'jpeg', quality: 86 });
   console.log('✓', name);
   await page.close();
 }
 
-for (const x of VIEWS) { try { await view(x.n, x.v, x.s); } catch (e) { console.log('✗', x.n, e.message); } }
+for (const x of VIEWS.filter((x) => !process.env.ONLY || process.env.ONLY.split(',').includes(x.n))) { try { await view(x.n, x.v, x.s); } catch (e) { console.log('✗', x.n, e.message); } }
 
+if (!process.env.ONLY) {
 // Route planen am echten Gelände: Bischofsheim → Kreuzberg
 try {
   await view('09-route-kreuzberg', { center: [9.99, 50.36], zoom: 12.6, pitch: 62, bearing: 20 },
@@ -69,5 +73,6 @@ try {
       console.log('route', await page.evaluate(() => window.__rb?.route?.data ? Math.round(window.__rb.route.data.total) + ' m' : 'keine'));
     });
 } catch (e) { console.log('✗ route', e.message); }
+}
 
 await browser.close();

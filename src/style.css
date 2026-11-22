@@ -383,6 +383,7 @@ body.drifting .fab-col { opacity:.55; }
 #night-tint { position:absolute; inset:0; z-index:1; pointer-events:none; mix-blend-mode:multiply;
   background: radial-gradient(140% 90% at 50% 30%, rgb(70,90,150), rgb(25,35,75));
   opacity: calc(var(--night, 0) * .72); transition: opacity 1.5s ease; }
+body.photo-style #night-tint { opacity: calc(var(--night, 0) * .42); }
 
 /* Ziel-Marker pulsiert */
 .wp-marker.end::after { content:''; position:absolute; left:50%; top:50%; width:34px; height:34px; margin:-17px 0 0 -17px;

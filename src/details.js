@@ -433,6 +433,7 @@ export function applyDaylight() {
   // Nachtabdunklung für helle Kartenstile (Dämmerung → Nacht)
   const night = isDarkStyle() && !currentStyleDef().photo ? 0 : Math.max(0, Math.min(1, (2 - sun.altitude) / 12));
   document.documentElement.style.setProperty('--night', night.toFixed(2));
+  document.body.classList.toggle('photo-style', !!photo);
   // Luftbild nachts/in der Dämmerung abdunkeln und kühler färben
   if (photo && map.getLayer('base')) {
     // Mondlicht: Gelände bleibt nachts erkennbar, nur kühler und gedämpft
