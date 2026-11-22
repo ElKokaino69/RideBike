@@ -404,11 +404,11 @@ export function applyFov(m = map) {
 function guardTerrainCollision(m) {
   // Kamera nie in oder direkt an Felswänden: Höhe unter der Kamera und im Blickfeld prüfen,
   // bei Bedarf sanft herauszoomen bzw. flacher neigen (auch nachdem das Gelände nachgeladen hat)
-  let tries = 0, busy = false;
+  let tries = 0;
   m.on('movestart', (e) => { if (e.originalEvent) tries = 0; });
   const check = () => {
     if (window.__rb) window.__rbGuardCalls = (window.__rbGuardCalls || 0) + 1;
-    if (busy || !m.getTerrain?.() || m.getPitch() < 40 || tries > 4 || m.isMoving()) return;
+    if (!m.getTerrain?.() || m.getPitch() < 40 || tries > 4 || m.isMoving()) return;
     let cam, alt;
     try { cam = m.transform.getCameraLngLat(); alt = m.transform.getCameraAltitude(); } catch { return; }
     if (!Number.isFinite(alt)) return;
@@ -428,16 +428,18 @@ function guardTerrainCollision(m) {
     if (window.__rb) window.__rbGuard = { alt: Math.round(alt), maxE: Math.round(maxE), looming, tries, near: pts };
     if (!Number.isFinite(maxE)) return;
     if (alt - maxE < 120 || looming) {
-      tries++; busy = true;
-      m.easeTo({ pitch: Math.max(48, m.getPitch() - 5), zoom: m.getZoom() - 0.35, duration: 500 });
-      m.once('moveend', () => { busy = false; setTimeout(check, 400); });
+      tries++;
+      const want = { pitch: Math.max(48, m.getPitch() - 5), zoom: m.getZoom() - 0.35 };
+      if (!settings.animations) m.jumpTo(want); else m.easeTo({ ...want, duration: 500 });
+      // Falls die Animation abgebrochen/überschrieben wurde: hart setzen, dann erneut prüfen
+      setTimeout(() => { if (Math.abs(m.getZoom() - want.zoom) > 0.05 && !m.isMoving()) m.jumpTo(want); setTimeout(check, 500); }, 800);
     }
   };
   // Die Karte wird durch Animationen selten "idle" → nach jeder Bewegung mehrfach nachprüfen,
   // weil die Höhendaten erst nach und nach geladen werden
   let timers = [];
   const schedule = () => { timers.forEach(clearTimeout); timers = [300, 1500, 4000, 8000, 14000].map((t) => setTimeout(check, t)); };
-  m.on('moveend', (e) => { if (!busy) schedule(); });
+  m.on('moveend', (e) => { if (e.originalEvent || !tries) schedule(); });
   m.on('idle', check);
 }
 
