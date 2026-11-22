@@ -18,6 +18,8 @@ const perms = [
   '<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />',
   '<uses-permission android:name="android.permission.VIBRATE" />',
   '<uses-permission android:name="android.permission.WAKE_LOCK" />',
+  '<uses-permission android:name="android.permission.CAMERA" />',
+  '<uses-feature android:name="android.hardware.camera" android:required="false" />',
   '<uses-feature android:name="android.hardware.location.gps" android:required="false" />'
 ];
 
@@ -28,6 +30,12 @@ for (const p of perms) {
     xml = xml.replace(/<\/manifest>\s*$/, `    ${p}\n</manifest>\n`);
     added++;
   }
+}
+
+// Kamera-App (Android 11+ Paketsichtbarkeit) für Foto-Spots
+if (!xml.includes('android.media.action.IMAGE_CAPTURE')) {
+  xml = xml.replace(/<\/manifest>\s*$/, `    <queries>\n        <intent>\n            <action android:name="android.media.action.IMAGE_CAPTURE" />\n        </intent>\n    </queries>\n</manifest>\n`);
+  added++;
 }
 
 // TTS-Dienst (Android 11+ Paketsichtbarkeit) für Sprachansagen

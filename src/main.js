@@ -26,15 +26,19 @@ import {
 import { ingestTrails } from './trails.js';
 import { initSky, applySkyFx } from './sky.js';
 import { initClouds, setCloudWind } from './clouds.js';
+import { photos, SPOT_KINDS, loadPhotos, loadSpotsAround, spotInReach, hasStamp, takeSpotPhoto, loadFull, deletePhoto, photoStats } from './photos.js';
 import { CATS as DISC_CATS, disc, initDiscover, toggleCat, clearAlong, onDiscoverStatus, alongRoute, isOpen, hoursDe, refresh as refreshDiscover } from './discover.js';
 import { simulate, compareLevels, chargersNear, ASSIST, BATTERIES } from './ebike.js';
 import { isEbike } from './bike.js';
 import { recordFlyover, shareVideo, videoSupported } from './video.js';
 import { routeWeather, bestStart, wmo, compass, windAt } from './weather.js';
+import { SURF, WAYS, climbSvg, gradeColor, toGpx, parseGpx } from './analysis.js';
+import { routeFromCoords } from './routing.js';
+import { sunPosition } from './details.js';
 import { parseWish, wishLabel, generateLoop } from './tourwish.js';
 import { startFallDetection, stopFallDetection, emergencyText, openSms, callNumber, locationLink } from './safety.js';
 import { loadWear, addRide as wearAddRide, status as wearStatus, resetPart, dueCount, shopUrl, addManualKm } from './wear.js';
-import { MILESTONES, CATS as MS_CATS, TIERS, evaluate, medalCounts, fmtValue, progress, tierOf } from './milestones.js';
+import { MILESTONES, CATS as MS_CATS, TIERS, evaluate, medalCounts, fmtValue, progress, tierOf, diffTiers } from './milestones.js';
 import { stats, rides, loadStats, initRecorder, rec, onRecord, startRide, finishRide, markArrived, liveUnlocks, countFlyover, rideElevationRoute } from './rides.js';
 import { initTrails, refreshTrails, onTrailStatus, getTrail, selectTrail, networkLabel } from './trails.js';
 import {
@@ -42,7 +46,7 @@ import {
   drawElevation, startFlyover, stopFlyover, isFlying, refreshRouteStyle, estimateTime
 } from './routing.js';
 import { loc, startLocation, onLocation, nav, startNavigation, stopNavigation, recenterNav, speak } from './nav.js';
-import { nearestOnLine, cumulative, fmtDist, fmtDur, fmtClock, bboxOf } from './geo.js';
+import { nearestOnLine, cumulative, fmtDist, fmtDur, fmtClock, bboxOf, dist } from './geo.js';
 import {
   $, $$, esc, ICON, maneuverSvg, toast, openSheet, closeSheet, isSheetOpen, enableSheetDrag, debounce, dialog, fmtBytes, bikeSvg, medalSvg
 } from './ui.js';
@@ -60,6 +64,8 @@ async function boot() {
   await loadSettings();
   await loadStats();
   await loadWear();
+  await loadPhotos();
+  stats.photo = photoStats();
   await initNetwork();
   await createMap('map', settings.lastView);
   initTrails();
@@ -119,7 +125,7 @@ async function boot() {
     setSetting('lastView', { center: [c.lng, c.lat], zoom: map.getZoom(), pitch: map.getPitch(), bearing: map.getBearing() });
   }, 1200));
 
-  if (/[?&]debug\b/.test(location.search)) window.__rb = { recordFlyover, simulate, wearStatus, map, settings, setSetting, growTerrain, nav, route, loc, stats, rides, celebrate, showRideSummary };
+  if (/[?&]debug\b/.test(location.search)) window.__rb = { recordFlyover, simulate, wearStatus, photos, map, settings, setSetting, growTerrain, nav, route, loc, stats, rides, celebrate, showRideSummary };
   // Quellenangabe kompakt starten (MapLibre klappt sie sonst anfangs auf)
   // Quellenangabe: kompakt, nur auf Antippen aufklappen (MapLibre klappt sie sonst selbst auf)
   document.addEventListener('click', (e) => {
@@ -130,6 +136,7 @@ async function boot() {
   initClouds();
   initDiscover();
   wireDiscover();
+  initPhotoSpots();
   map.on('rotate', updateCompass);
   map.on('pitch', update3dButton);
   map.once('load', () => {
@@ -162,6 +169,8 @@ function injectIcons() {
   set('#s-ic', ICON.search);
   set('#btn-offline .mm-ic', ICON.cloud);
   set('#btn-mybike .mm-ic', ICON.bike);
+  set('#btn-gpx .mm-ic', ICON.routeIc);
+  set('#rp-gpx', ICON.share || ICON.routeIc);
   set('#btn-safety .mm-ic', ICON.shield);
   set('#safety-close', ICON.chevL);
   set('#btn-plan', ICON.navArrow);
@@ -477,6 +486,9 @@ function wireFabs() {
   $('#btn-more').onclick = (e) => { e.stopPropagation(); setMore(menu.hidden); };
   menu.addEventListener('click', () => setTimeout(() => setMore(false), 120));
   $('#btn-mybike').onclick = () => openSheet('sheet-bike');
+  $('#btn-gpx').onclick = () => $('#gpx-file').click();
+  $('#gpx-file').onchange = (e) => { const f = e.target.files?.[0]; if (f) importGpx(f); e.target.value = ''; };
+  $('#rp-gpx').onclick = exportGpx;
   $('#btn-safety').onclick = () => { renderSafety(); openSheet('sheet-safety'); };
   $('#safety-close').onclick = () => closeSheet('sheet-safety');
   wireFallAlarm();
@@ -484,11 +496,12 @@ function wireFabs() {
   document.addEventListener('click', (e) => {
     if (!e.target.closest('.pro-badge')) return;
     e.stopPropagation();
-    dialog({
+    const d = dialog({
       icon: ICON.medal, title: 'RideBike Pro',
       text: 'E-Bike-Reichweite mit Akku-Planer, Wartungs-Tracker und 3D-Videos sind Pro-Funktionen. In der Beta sind sie für dich kostenlos freigeschaltet.',
       buttons: [{ label: 'Alles klar', primary: true }]
     });
+    d.then(() => d.close());
   }, true);
   map.on('click', () => setMore(false));
   map.on('dragstart', () => setMore(false));
@@ -874,9 +887,288 @@ function renderStats() {
   countUp($('#st-time'), r.time, (v) => fmtDur(v));
   if (r.hasEle) countUp($('#st-asc'), r.ascent, (v) => `+${Math.round(v)} m`);
   else $('#st-asc').textContent = '–';
+  renderAnalysisCard();
   renderEbikeCard();
   renderWeatherCard();
   renderAlongCard();
+}
+
+/** Hinweis, wenn die Ankunft nach Sonnenuntergang liegt */
+function daylightTip(r, startAt) {
+  const [lng, lat] = r.coords[r.coords.length - 1];
+  const arrive = startAt + (r.time || 0) * 1000;
+  const alt = (t) => sunPosition(new Date(t), lat, lng).altitude;
+  if (alt(startAt) < -0.8) return `<div class="eb-tip dl">🌙 Start bei Dunkelheit – Licht einschalten.</div>`;
+  let t = startAt;
+  while (t < arrive + 36e5 * 6 && alt(t) > -0.8) t += 5 * 60e3;
+  if (t > arrive) return '';
+  const late = Math.round((arrive - t) / 60e3);
+  const clock = (x) => new Date(x).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  return `<div class="eb-tip dl">🌇 Sonnenuntergang ${clock(t)} – Ankunft ${late} min danach. Licht mitnehmen!</div>`;
+}
+
+// ---------------------------------------------------------------------
+// Foto-Spots & Sammelpass (Fotojäger)
+// ---------------------------------------------------------------------
+let spotCheckAt = 0, spotCheckPos = null, spotOffered = new Set(), spotMarkers = [];
+function initPhotoSpots() {
+  onLocation(() => {
+    if (!loc.pos || !isOnline()) return;
+    const now = Date.now();
+    if (now - spotCheckAt < 12000 && spotCheckPos && dist(spotCheckPos, loc.pos) < 120) return;
+    spotCheckAt = now; spotCheckPos = loc.pos;
+    loadSpotsAround(loc.pos).then(() => { checkSpot(); renderSpotLayer(); });
+  });
+  const loadView = () => { if (map.getZoom() >= 12 && isOnline()) loadSpotsAround([map.getCenter().lng, map.getCenter().lat]).then(() => { renderSpotLayer(); checkSpot(); }); };
+  map.on('moveend', debounce(loadView, 900));
+  map.once('idle', loadView);
+  onStyleReadyLocal((m) => {
+    if (!m.getSource('rb-spots')) m.addSource('rb-spots', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+    if (!m.hasImage('rb-spot')) m.addImage('rb-spot', spotIcon(), { pixelRatio: 2 });
+    m.addLayer({ id: 'rb-spots', type: 'symbol', source: 'rb-spots', minzoom: 12,
+      layout: { 'icon-image': 'rb-spot', 'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.55, 16, 0.85], 'icon-allow-overlap': false, 'icon-anchor': 'bottom' } });
+    renderSpotLayer();
+  });
+  $('#spot-banner .sb-go').onclick = () => { const s = spotOfferCurrent; hideSpotBanner(); if (s) shootSpot(s); };
+  $('#spot-banner .sb-x').onclick = () => hideSpotBanner();
+  $('#ph-close').onclick = () => { $('#photo-view').hidden = true; };
+  renderStampMarkers();
+}
+
+function spotIcon() {
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d');
+  g.shadowColor = 'rgba(0,0,0,.45)'; g.shadowBlur = 6; g.shadowOffsetY = 2;
+  g.beginPath(); g.arc(32, 26, 20, Math.PI * 0.8, Math.PI * 0.2); g.lineTo(32, 60); g.closePath();
+  g.fillStyle = '#fff'; g.fill(); g.shadowColor = 'transparent';
+  g.beginPath(); g.arc(32, 26, 16.5, 0, 7);
+  const gr = g.createLinearGradient(0, 10, 0, 44); gr.addColorStop(0, '#f472b6'); gr.addColorStop(1, '#be185d'); g.fillStyle = gr; g.fill();
+  g.strokeStyle = '#fff'; g.lineWidth = 2.4; g.lineJoin = 'round';
+  g.strokeRect(22, 20, 20, 13); g.beginPath(); g.arc(32, 26.5, 4, 0, 7); g.stroke();
+  g.beginPath(); g.moveTo(27, 20); g.lineTo(29, 17); g.lineTo(35, 17); g.lineTo(37, 20); g.stroke();
+  return g.getImageData(0, 0, 64, 64);
+}
+
+function onStyleReadyLocal(fn) { if (map.isStyleLoaded()) fn(map); map.on('style.load', () => fn(map)); }
+
+function renderSpotLayer() {
+  const src = map.getSource?.('rb-spots');
+  if (!src) return;
+  const feats = [...photos.spots.values()].filter((s) => !hasStamp(s.id)).map((s) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: s.lngLat }, properties: { id: s.id, name: s.name, kind: s.kind } }));
+  src.setData({ type: 'FeatureCollection', features: feats });
+}
+
+/** Gesammelte Stempel als kleine Foto-Marker auf der Karte */
+function renderStampMarkers() {
+  spotMarkers.forEach((m) => m.remove()); spotMarkers = [];
+  const seen = new Set();
+  for (const p of photos.list) {
+    if (seen.has(p.spotId) || spotMarkers.length >= 60) continue;
+    seen.add(p.spotId);
+    const el = document.createElement('div');
+    el.className = 'stamp-marker';
+    el.style.backgroundImage = `url(${p.thumb})`;
+    el.onclick = (e) => { e.stopPropagation(); openPhoto(p.id); };
+    spotMarkers.push(new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat(p.lngLat).addTo(map));
+  }
+}
+
+let spotOfferCurrent = null;
+function checkSpot() {
+  if (!loc.pos) return;
+  const s = spotInReach(loc.pos);
+  if (!s || hasStamp(s.id) || spotOffered.has(s.id)) return;
+  spotOffered.add(s.id);
+  spotOfferCurrent = s;
+  const k = SPOT_KINDS[s.kind];
+  const b = $('#spot-banner');
+  b.querySelector('.sb-ic').textContent = k.emoji;
+  b.querySelector('b').textContent = s.name;
+  b.querySelector('small').textContent = `${k.name} · Foto-Spot erreicht – Stempel sammeln!`;
+  b.hidden = false; b.classList.remove('out');
+  if (navigator.vibrate) navigator.vibrate([60, 40, 60]);
+  if (nav.active || rec.active) speak?.(`Foto-Spot erreicht: ${s.name}.`);
+  clearTimeout(b._t); b._t = setTimeout(hideSpotBanner, 25000);
+}
+function hideSpotBanner() { const b = $('#spot-banner'); b.classList.add('out'); setTimeout(() => { b.hidden = true; }, 300); }
+
+async function shootSpot(spot) {
+  try {
+    const before = evaluate(stats);
+    const rideId = rec.active && rec.ride ? `r${rec.ride.start}` : null;
+    const e = await takeSpotPhoto(spot, loc.pos, rideId);
+    stats.photo = photoStats();
+    const unlocked = diffTiers(before, evaluate(stats));
+    unlocked.forEach((u) => { stats.announced[u.m.id] = Math.max(stats.announced[u.m.id] || 0, u.tier); });
+    renderSpotLayer(); renderStampMarkers();
+    showStamp(e, unlocked);
+  } catch (err) {
+    console.warn('Foto-Spot', err);
+    if (!/abgebrochen|cancel/i.test(String(err?.message || err))) toast('Foto konnte nicht gespeichert werden');
+  }
+}
+
+function showStamp(e, unlocked) {
+  const k = SPOT_KINDS[e.kind];
+  const el = $('#stamp-pop');
+  el.innerHTML = `<div class="sp-card"><div class="sp-photo" style="background-image:url(${e.thumb})"><span class="sp-stamp" style="--c:${k.color}">${k.emoji}<b>${new Date(e.ts).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' })}</b></span></div>
+    <h3>${e.first ? 'Stempel gesammelt!' : 'Foto gespeichert'}</h3><p>${esc(e.name)} · ${k.name}</p>
+    <small>${new Set(photos.list.map((p) => p.spotId)).size} Spots im Sammelpass</small></div>`;
+  el.hidden = false; el.classList.remove('out');
+  if (navigator.vibrate) navigator.vibrate([30, 60, 120]);
+  setTimeout(() => { el.classList.add('out'); setTimeout(() => { el.hidden = true; if (unlocked.length) celebrate(unlocked); }, 350); }, 2600);
+}
+
+function albumHtml() {
+  const near = loc.pos ? [...photos.spots.values()].filter((s) => !hasStamp(s.id)).map((s) => ({ ...s, d: dist(loc.pos, s.lngLat) })).sort((a, b) => a.d - b.d).slice(0, 6) : [];
+  const seen = new Set();
+  const stamps = photos.list.filter((p) => !seen.has(p.spotId) && seen.add(p.spotId));
+  return `
+    ${near.length ? `<div class="ms-cat-title" style="--c:#ec4899"><i></i>Foto-Jagd in deiner Nähe</div>
+      <div class="hunt">${near.map((s) => `<button class="hunt-item" data-hunt="${esc(s.id)}"><span class="hi-e">${SPOT_KINDS[s.kind].emoji}</span>
+        <span class="lbl"><b>${esc(s.name)}</b><small>${SPOT_KINDS[s.kind].name} · ${fmtDist(s.d)}</small></span><span class="hi-go">${ICON.nav}</span></button>`).join('')}</div>` : ''}
+    <div class="ms-cat-title" style="--c:#ec4899"><i></i>Sammelpass · ${stamps.length} Stempel</div>
+    ${stamps.length ? `<div class="album">${stamps.map((p, i) => `<button class="stamp" data-photo="${p.id}" style="--i:${i};background-image:url(${p.thumb})">
+        <span class="st-badge" style="--c:${SPOT_KINDS[p.kind]?.color || '#ec4899'}">${SPOT_KINDS[p.kind]?.emoji || '📍'}</span>
+        <span class="st-txt"><b>${esc(p.name)}</b><small>${new Date(p.ts).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}</small></span></button>`).join('')}</div>`
+      : `<div class="ms-empty">📸<br>Noch keine Stempel.<br>Fahr zu einem Gipfel, einer Aussicht oder Burg – die App meldet sich, sobald du da bist.</div>`}`;
+}
+
+async function openPhoto(id) {
+  const p = photos.list.find((x) => x.id === id); if (!p) return;
+  const v = $('#photo-view');
+  v.hidden = false;
+  $('#ph-img').style.backgroundImage = `url(${p.thumb})`;
+  $('#ph-title').textContent = p.name;
+  $('#ph-sub').textContent = `${SPOT_KINDS[p.kind]?.name || ''} · ${new Date(p.ts).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
+  loadFull(id).then((full) => { if (full) $('#ph-img').style.backgroundImage = `url(${full})`; }).catch(() => {});
+  $('#ph-map').onclick = () => { v.hidden = true; closeSheet('sheet-ms'); map.flyTo({ center: p.lngLat, zoom: 15.5, pitch: 60, duration: 1600 }); };
+  $('#ph-share').onclick = async () => {
+    try {
+      const full = (await loadFull(id)) || p.thumb;
+      const text = `${p.name} – Stempel im RideBike-Sammelpass 📸🚴`;
+      if (Capacitor.isNativePlatform()) {
+        const { Filesystem, Directory } = await import('@capacitor/filesystem');
+        const { Share } = await import('@capacitor/share');
+        const w = await Filesystem.writeFile({ path: `share-${id}.jpg`, data: full.split(',')[1], directory: Directory.Cache });
+        await Share.share({ title: p.name, text, url: w.uri, dialogTitle: 'Foto teilen' });
+      } else {
+        const blob = await (await fetch(full)).blob();
+        const f = new File([blob], `${p.name}.jpg`, { type: 'image/jpeg' });
+        if (navigator.canShare?.({ files: [f] })) await navigator.share({ files: [f], text });
+        else { const a = document.createElement('a'); a.href = full; a.download = `${p.name}.jpg`; a.click(); }
+      }
+    } catch { /* abgebrochen */ }
+  };
+  $('#ph-del').onclick = async () => {
+    const dlg = dialog({ icon: ICON.trash, title: 'Foto löschen?', text: 'Der Stempel verschwindet aus dem Sammelpass.', buttons: [{ label: 'Abbrechen', value: false }, { label: 'Löschen', danger: true, value: true }] });
+    const res = await dlg; dlg.close();
+    if (!res?.value) return;
+    await deletePhoto(id); stats.photo = photoStats(); v.hidden = true; renderStampMarkers(); renderSpotLayer(); renderMilestones();
+  };
+}
+
+// ---------------------------------------------------------------------
+// Routen-Analyse: Untergrund, Wegarten, Anstiege
+// ---------------------------------------------------------------------
+function bar(list, data, total) {
+  const parts = list.map((x) => [x, data[x.id] || 0]).filter(([, v]) => v > total * 0.01);
+  return `<div class="an-bar">${parts.map(([x, v]) => `<i style="width:${(v / total) * 100}%;background:${x.color}"></i>`).join('')}</div>
+    <div class="an-legend">${parts.sort((a, b) => b[1] - a[1]).map(([x, v]) => `<span style="--c:${x.color}">${x.name} ${Math.round((v / total) * 100)} %</span>`).join('')}</div>`;
+}
+
+function renderAnalysisCard() {
+  const card = $('#analysis-card');
+  const r = route.data;
+  if (!r || (!r.surface && !r.climbs?.length)) { card.hidden = true; return; }
+  card.hidden = false;
+  const sf = r.surface;
+  const tot = sf ? Object.values(sf.surf).reduce((a, b) => a + b, 0) || 1 : 1;
+  const climbs = r.climbs || [];
+  card.innerHTML = `
+    ${sf ? `<div class="an-sec"><b>Untergrund</b>${bar(SURF, sf.surf, tot)}</div>
+    <div class="an-sec"><b>Wege</b>${bar(WAYS, sf.way, tot)}</div>` : ''}
+    ${climbs.length ? `<div class="an-sec"><b>Anstiege <span class="an-n">${climbs.length}</span> <span class="pro-badge">PRO</span></b>
+      <div class="climbs">${climbs.map((c, i) => `
+        <div class="climb" data-c="${i}">
+          <span class="cl-cat c${c.cat}">${c.catName}</span>
+          <div class="cl-txt"><b>${fmtDist(c.len)} · Ø ${(c.avg * 100).toFixed(1).replace('.', ',')} %</b>
+            <small>ab km ${(c.startM / 1000).toFixed(1).replace('.', ',')} · +${Math.round(c.gain)} m · max ${Math.round(c.max * 100)} %</small></div>
+          ${climbSvg(r, c)}
+        </div>`).join('')}</div></div>` : ''}`;
+  $$('#analysis-card .climb').forEach((el) => el.onclick = () => {
+    const c = climbs[+el.dataset.c];
+    map.fitBounds(bboxOf(r.coords.slice(c.i0, c.i1 + 1)), { padding: { top: 120, bottom: Math.min(window.innerHeight * 0.62, 470), left: 60, right: 60 }, pitch: 60, duration: 1200 });
+  });
+}
+
+// Live-Anstieg während der Navigation („Climb-Assistent“)
+let climbAnnounced = -1;
+function updateNavClimb(remaining) {
+  const el = $('#nav-climb');
+  const r = route.data;
+  if (!r?.climbs?.length) { el.hidden = true; return; }
+  const at = r.total - remaining;
+  const idx = r.climbs.findIndex((c) => at >= c.startM - 400 && at <= c.endM);
+  if (idx < 0) { el.hidden = true; return; }
+  const c = r.climbs[idx];
+  const inside = at >= c.startM;
+  const left = inside ? c.endM - at : c.len;
+  const frac = inside ? (at - c.startM) / c.len : 0;
+  const gainLeft = c.gain * (1 - frac);
+  el.hidden = false;
+  el.innerHTML = `<div class="nc-top"><span class="cl-cat c${c.cat}">${c.catName}</span>
+    <b>${inside ? `Noch ${fmtDist(left)}` : `Anstieg in ${fmtDist(c.startM - at)}`}</b>
+    <small>Ø ${(c.avg * 100).toFixed(1).replace('.', ',')} % · ${inside ? `+${Math.round(gainLeft)} m übrig` : `+${Math.round(c.gain)} m`}</small>
+    <em>${idx + 1}/${r.climbs.length}</em></div>
+    ${climbSvg(r, c, 260, 40, at)}`;
+  if (!inside && climbAnnounced !== idx && c.startM - at < 250) {
+    climbAnnounced = idx;
+    speak?.(`Anstieg beginnt: ${(c.len / 1000).toFixed(1).replace('.', ',')} Kilometer mit ${Math.round(c.avg * 100)} Prozent.`);
+  }
+}
+
+// ---------------------------------------------------------------------
+// GPX: exportieren (Garmin, Wahoo, Freunde) & importieren
+// ---------------------------------------------------------------------
+async function exportGpx() {
+  const r = route.data; if (!r) return;
+  const name = plan.end?.label ? `RideBike – ${plan.end.label}` : 'RideBike-Tour';
+  const xml = toGpx(r, name);
+  const file = `${name.replace(/[^\wäöüÄÖÜß-]+/g, '_').slice(0, 60)}.gpx`;
+  try {
+    if (Capacitor.isNativePlatform()) {
+      const { Filesystem, Directory, Encoding } = await import('@capacitor/filesystem');
+      const { Share } = await import('@capacitor/share');
+      const w = await Filesystem.writeFile({ path: file, data: xml, directory: Directory.Cache, encoding: Encoding.UTF8 });
+      await Share.share({ title: name, text: 'Route aus RideBike (GPX) – für Garmin, Wahoo & Co.', url: w.uri, dialogTitle: 'GPX teilen' });
+    } else {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([xml], { type: 'application/gpx+xml' }));
+      a.download = file; document.body.appendChild(a); a.click();
+      setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 3000);
+      toast('GPX gespeichert');
+    }
+  } catch { /* abgebrochen */ }
+}
+
+async function importGpx(fileObj) {
+  try {
+    const { coords, name } = parseGpx(await fileObj.text());
+    const r = routeFromCoords(coords);
+    routeSeq++;
+    plan.start = { gps: false, lngLat: coords[0].slice(0, 2), label: 'Track-Start' };
+    plan.end = { lngLat: coords[coords.length - 1].slice(0, 2), label: name };
+    plan.vias = []; plan.imported = true; plan.wish = null;
+    renderPlan(); syncMarkers();
+    openSheet('sheet-route');
+    showRoute(r, { padding: { top: 120, bottom: Math.min(window.innerHeight * 0.62, 470), left: 50, right: 50 } });
+    renderStats();
+    requestAnimationFrame(() => drawElevation($('#elev'), r, onElevHover));
+    $('#btn-go').disabled = false; $('#btn-fly').disabled = false; $('#btn-video').disabled = false;
+    updateOfflineCard();
+    toast(`„${name}“ geladen – ${fmtDist(r.total)}`);
+  } catch (e) { toast(e.message || 'GPX konnte nicht gelesen werden'); }
 }
 
 // ---------------------------------------------------------------------
@@ -931,12 +1223,14 @@ function showDiscInfo(f) {
       ${p.phone ? `<button class="btn ghost" data-href="tel:${esc(p.phone.split(';')[0].replace(/\s/g, ''))}">Anrufen</button>` : ''}
       ${p.web ? `<button class="btn ghost" data-href="${esc(p.web.split(';')[0])}">Website</button>` : ''}
     </div>
+    ${loc.pos && distM != null && distM < 150 ? `<button class="btn video-cta" id="di-photo">📸 <span>Foto-Stempel sammeln</span></button>` : ''}
     <div class="actions">
       ${plan.end ? `<button class="btn ghost" id="di-via">${ICON.plus}<span>Als Stopp</span></button>` : ''}
       <button class="btn primary" id="di-go">${ICON.nav}<span>Hierher fahren</span></button>
     </div>`;
   $$('#info-body [data-href]').forEach((b) => b.onclick = () => window.open(b.dataset.href, '_blank'));
   $('#di-go').onclick = () => { closeSheet('sheet-info'); setDestination(ll, p.name); };
+  $('#di-photo')?.addEventListener('click', () => { closeSheet('sheet-info'); shootSpot({ id: p.id, name: p.name, kind: p.cat === 'see' ? 'sight' : 'sight', lngLat: ll }); });
   $('#di-via')?.addEventListener('click', () => { closeSheet('sheet-info'); plan.vias.push({ lngLat: ll, label: p.name }); renderPlan(); syncMarkers(); recompute(); openSheet('sheet-route'); toast(`${p.name} als Stopp eingefügt`); });
   closeSheet('sheet-route');
   openSheet('sheet-info');
@@ -1020,6 +1314,7 @@ async function renderWeatherCard() {
       <div class="wx-starts">${starts.map((x) => `<button data-wx="${x.at}" data-h="${x.h}" class="${x === cur ? 'on' : ''} ${x === best ? 'best' : ''}">
         <b>${x.h === 0 ? 'Jetzt' : clock(x.at).replace(':00', ' Uhr')}</b><small>${x.w.maxPop >= 30 ? '🌧️ ' + x.w.maxPop + ' %' : pct(x.w.tailShare) >= pct(x.w.headShare) ? '↗ Rückenw.' : '↙ Gegenw.'}</small></button>`).join('')}</div>
       ${best !== cur ? `<div class="eb-tip">Beste Startzeit: <b>${best.h === 0 ? 'jetzt' : clock(best.at)}</b>${best.w.maxPop < cur.w.maxPop - 15 ? ' – trockener' : ''}${best.w.headShare < cur.w.headShare - 0.15 ? ' – weniger Gegenwind' : ''}</div>` : ''}
+      ${daylightTip(r, cur.at)}
       ${loop && w.headShare > w.tailShare + 0.15 ? `<div class="eb-tip">Andersherum fährst du mehr mit Rückenwind. <button class="btn tiny" id="wx-reverse">Richtung drehen</button></div>` : ''}`;
     $$('#weather-card [data-wx]').forEach((b) => b.onclick = () => { wxStart = +b.dataset.h === 0 ? 0 : +b.dataset.wx; renderWeatherCard(); });
     $('#wx-reverse')?.addEventListener('click', () => { plan.vias.reverse(); renderPlan(); syncMarkers(); recompute(); toast('Richtung gedreht'); });
@@ -1115,6 +1410,7 @@ async function showChargers() {
 }
 
 function setDestination(lngLat, label) {
+  plan.imported = false;
   plan.end = { lngLat, label };
   closeSheet('sheet-info');
   closeSheet('sheet-layers');
@@ -1128,6 +1424,7 @@ function setDestination(lngLat, label) {
 }
 
 function setStart(lngLat, label) {
+  plan.imported = false;
   plan.start = { gps: false, lngLat, label };
   renderPlan();
   if (plan.end) { syncMarkers(); recompute(); }
@@ -1136,6 +1433,7 @@ function setStart(lngLat, label) {
 
 function addVia(lngLat, label) {
   plan.vias.push({ lngLat, label });
+  plan.imported = false;
   renderPlan(); syncMarkers(); recompute();
 }
 
@@ -1260,7 +1558,7 @@ function wireFallAlarm() {
 function clearPlan() {
   $('#offline-card').hidden = true;
   routeSeq++;
-  plan.end = null; plan.vias = []; plan.wish = null; plan.loop = false; plan.start = { gps: true, lngLat: null, label: 'Mein Standort' };
+  plan.end = null; plan.vias = []; plan.wish = null; plan.loop = false; plan.imported = false; climbAnnounced = -1; plan.start = { gps: true, lngLat: null, label: 'Mein Standort' };
   syncMarkers();
   clearRoute();
   elevMarker?.remove(); elevMarker = null;
@@ -1270,6 +1568,9 @@ function clearPlan() {
 
 async function recompute() {
   if (!plan.end) return;
+  if (plan.imported && route.data?.imported) {
+    route.data.time = estimateTime(route.data.total, route.data.ascent); renderStats(); return;
+  }
   const my = ++routeSeq;
   let start = plan.start.gps ? loc.pos : plan.start.lngLat;
   if (!start) {
@@ -2153,8 +2454,8 @@ function renderMilestones() {
       <div class="ms-count">${medalSvg(3, 'trophy', '#e0a51c', 44)}<b>${c.gold}</b><small>Gold</small></div>
       <div class="ms-count">${medalSvg(2, 'trophy', '#8e9aa6', 44)}<b>${c.silver}</b><small>Silber</small></div>
       <div class="ms-count">${medalSvg(1, 'trophy', '#b8682e', 44)}<b>${c.bronze}</b><small>Bronze</small></div>
-      <div class="ms-total"><div class="row2"><span>${done} von 150 Stufen</span><span>${Math.round((done / 150) * 100)} %</span></div>
-        <div class="ms-bar" style="--i:0"><i style="width:${(done / 150) * 100}%"></i></div></div>
+      <div class="ms-total"><div class="row2"><span>${done} von ${MILESTONES.length * 3} Stufen</span><span>${Math.round((done / (MILESTONES.length * 3)) * 100)} %</span></div>
+        <div class="ms-bar" style="--i:0"><i style="width:${(done / (MILESTONES.length * 3)) * 100}%"></i></div></div>
     </div>
     <div class="ms-totals">
       <div><b>${fmtValue({ unit: 'km' }, stats.totalKm)}</b><small>gesamt</small></div>
@@ -2162,9 +2463,9 @@ function renderMilestones() {
       <div><b>${stats.rides}</b><small>Fahrten</small></div>
       <div><b>${hours < 10 ? hours.toFixed(1).replace('.', ',') : Math.round(hours)} h</b><small>im Sattel</small></div>
     </div>
-    <div class="ms-tabs"><button data-tab="ms" class="${msTab === 'ms' ? 'on' : ''}">Meilensteine</button><button data-tab="rides" class="${msTab === 'rides' ? 'on' : ''}">Fahrten (${rides.length})</button></div>`;
+    <div class="ms-tabs"><button data-tab="ms" class="${msTab === 'ms' ? 'on' : ''}">Meilensteine</button><button data-tab="rides" class="${msTab === 'rides' ? 'on' : ''}">Fahrten (${rides.length})</button><button data-tab="photos" class="${msTab === 'photos' ? 'on' : ''}">Sammelpass (${new Set(photos.list.map((p) => p.spotId)).size})</button></div>`;
   if (msTab === 'ms') {
-    html += `<div class="ms-cats"><button data-cat="all" class="${msCat === 'all' ? 'on' : ''}">Alle 50</button>${MS_CATS.map((k) => `<button data-cat="${k.id}" style="--c:${k.color}" class="${msCat === k.id ? 'on' : ''}">${k.name}</button>`).join('')}</div>`;
+    html += `<div class="ms-cats"><button data-cat="all" class="${msCat === 'all' ? 'on' : ''}">Alle ${MILESTONES.length}</button>${MS_CATS.map((k) => `<button data-cat="${k.id}" style="--c:${k.color}" class="${msCat === k.id ? 'on' : ''}">${k.name}</button>`).join('')}</div>`;
     let i = 0;
     for (const k of MS_CATS) {
       if (msCat !== 'all' && msCat !== k.id) continue;
@@ -2180,6 +2481,8 @@ function renderMilestones() {
         </button>`;
       }).join('')}</div>`;
     }
+  } else if (msTab === 'photos') {
+    html += albumHtml();
   } else {
     html += rides.length ? rides.map((r, i) => {
       const d = new Date(r.start);
@@ -2349,6 +2652,10 @@ function wireMilestones() {
   $('#ms-close').onclick = () => closeSheet('sheet-ms');
   $('#ride-close').onclick = () => closeSheet('sheet-ride');
   $('#ms-body').addEventListener('click', (e) => {
+    const ph = e.target.closest('[data-photo]');
+    if (ph) { openPhoto(ph.dataset.photo); return; }
+    const hu = e.target.closest('[data-hunt]');
+    if (hu) { const sp = photos.spots.get(hu.dataset.hunt); if (sp) { closeSheet('sheet-ms'); setDestination(sp.lngLat, sp.name); } return; }
     const tab = e.target.closest('[data-tab]');
     if (tab) { msTab = tab.dataset.tab; renderMilestones(); return; }
     const cat = e.target.closest('[data-cat]');
@@ -2418,6 +2725,7 @@ function showRoadRef(m) {
 let arrivedOnce = false;
 const navUi = {
   update({ m, distTo, next, remaining, speed, eta, onRoute }) {
+    updateNavClimb(remaining);
     const icon = $('#nav-icon');
     const key = `${m.idx}|${m.type}|${onRoute}`;
     if (key !== lastManeuverKey) {

@@ -79,6 +79,7 @@
         <button id="btn-legend"><span class="mm-ic"></span><span>Radwege &amp; Trails</span></button>
         <button id="btn-layers"><span class="mm-ic"></span><span>Kartenansicht</span></button>
         <button id="btn-mybike"><span class="mm-ic"></span><span>Mein Rad &amp; Wartung</span><i class="mm-dot" id="wear-dot" hidden></i></button>
+        <button id="btn-gpx"><span class="mm-ic"></span><span>GPX importieren</span></button>
         <button id="btn-safety"><span class="mm-ic"></span><span>Sicherheit &amp; Notfall</span></button>
         <button id="btn-offline"><span class="mm-ic"></span><span>Offline-Karten</span></button>
         <button id="btn-trophy"><span class="mm-ic"></span><span>Meilensteine</span></button>
@@ -104,6 +105,7 @@
     <div class="sheet-head">
       <button id="rp-back" class="icon-btn" aria-label="Zurück"></button>
       <h2>Route planen</h2>
+      <button id="rp-gpx" class="icon-btn" aria-label="Als GPX teilen"></button>
       <button id="rp-close" class="icon-btn" aria-label="Schließen"></button>
     </div>
     <div class="plan-list">
@@ -132,6 +134,7 @@
         </div>
       </div>
     </div>
+    <div id="analysis-card" class="analysis-card" hidden></div>
     <div id="ebike-card" class="ebike-card" hidden></div>
     <div id="weather-card" class="weather-card" hidden></div>
     <div id="along-card" class="along-card" hidden></div>
@@ -245,6 +248,7 @@
         <span id="nav-badge" class="nav-badge" hidden></span>
       </div>
       <div id="nav-then" class="nav-then" hidden></div>
+      <div id="nav-climb" class="nav-climb glass" hidden></div>
     </div>
     <div class="nav-side">
       <button id="nav-voice" class="nfab glass" aria-label="Sprachansagen"></button>
@@ -326,6 +330,22 @@
     </div>
   </div>
 
+  <input type="file" id="gpx-file" accept=".gpx,application/gpx+xml,application/xml,text/xml" hidden>
+  <div id="spot-banner" class="spot-banner glass" hidden>
+    <span class="sb-ic">📸</span>
+    <div class="sb-txt"><b></b><small></small></div>
+    <button class="btn tiny sb-go">Foto machen</button>
+    <button class="sb-x" aria-label="Schließen">✕</button>
+  </div>
+  <div id="stamp-pop" class="stamp-pop" hidden></div>
+  <div id="photo-view" class="photo-view" hidden>
+    <div class="ph-img" id="ph-img"></div>
+    <div class="ph-bar glass">
+      <div class="ph-txt"><b id="ph-title"></b><small id="ph-sub"></small></div>
+      <div class="ph-actions"><button class="btn ghost" id="ph-map">Karte</button><button class="btn primary" id="ph-share">Teilen</button><button class="btn ghost" id="ph-del">Löschen</button></div>
+    </div>
+    <button class="ph-close" id="ph-close" aria-label="Schließen">✕</button>
+  </div>
   <div id="toast" role="status"></div>
   <script type="module" src="./src/main.js"></script>
 </body>

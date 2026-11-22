@@ -10,6 +10,7 @@ import { fetchJson } from './ui.js';
 import { brouterRequest, estimateSeconds } from './bike.js';
 import { quality, animationsActive } from './graphics.js';
 import { isOnline } from './offline.js';
+import { analyzeSurface, findClimbs } from './analysis.js';
 
 export const route = {
   data: null // { coords, cum, total, ascent, descent, time, maneuvers, hasEle, profile }
@@ -101,7 +102,28 @@ async function calcRouteWith(points, profile, params) {
   const brTime = Number(pr['total-time']);
   const hasPhysics = Object.keys(params).includes('bikerPower');
   const time = hasPhysics && brTime > 0 ? brTime : estimateSeconds(total, ascent);
-  return { coords, cum, total, ascent, descent, hasEle, maneuvers, profile, time, brTime: hasPhysics ? brTime : 0 };
+  const out = { coords, cum, total, ascent, descent, hasEle, maneuvers, profile, time, brTime: hasPhysics ? brTime : 0 };
+  out.surface = analyzeSurface(pr.messages);
+  out.climbs = findClimbs(out);
+  return out;
+}
+
+/** Route aus fremder Quelle (GPX) zu einem RideBike-Routenobjekt machen */
+export function routeFromCoords(coords) {
+  const cum = cumulative(coords);
+  const total = cum[cum.length - 1];
+  const hasEle = coords.every((c) => c[2] != null && !isNaN(c[2]));
+  let ascent = 0, descent = 0;
+  if (hasEle) {
+    let last = coords[0][2];
+    for (let i = 1; i < coords.length; i++) {
+      const d = coords[i][2] - last;
+      if (Math.abs(d) >= 3) { if (d > 0) ascent += d; else descent -= d; last = coords[i][2]; }
+    }
+  }
+  const out = { coords, cum, total, ascent, descent, hasEle, maneuvers: buildManeuvers(coords, cum, null), profile: 'gpx', time: estimateSeconds(total, ascent), brTime: 0, imported: true };
+  out.climbs = findClimbs(out);
+  return out;
 }
 
 export function estimateTime(meters, ascent) {

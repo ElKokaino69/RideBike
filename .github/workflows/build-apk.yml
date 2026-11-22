@@ -62,3 +62,27 @@ jobs:
           git config user.email "ci@users.noreply.github.com"
           git add . && git commit -qm "APK ${GITHUB_SHA::7}"
           git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" apk
+
+  # Web-Version (gleicher Code) als Webseite: https://<konto>.github.io/<repo>/
+  # Einmalig nötig: GitHub → Settings → Pages → Source: „GitHub Actions“
+  web:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci && npm run build
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: www
+      - uses: actions/deploy-pages@v4

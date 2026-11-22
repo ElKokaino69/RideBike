@@ -15,6 +15,14 @@ App-ID: `de.enders.ridebike` · Capacitor 8 · MapLibre GL 5 · Vite
 - Animierter Kartenstart (Anflug zum Standort), leuchtende Radwege, fließende Routenlinie
 - Kompass, 2D/3D-Umschalter, Drehen und Neigen mit zwei Fingern
 
+**Marktvorteile (v2.0)**
+- Routen-Analyse: Untergrund (Asphalt/Pflaster/Schotter/Erde/Trail) und Wegarten (Radweg, ruhige Straße, Wirtschaftsweg, Pfad, Verkehr) aus BRouter-WayTags
+- Climb-Assistent: Anstiege mit Kategorie (Hügel … HC), Länge, Ø/max. Steigung, farbiges Mini-Profil; in der Navigation live „Noch 820 m · +58 m übrig“ mit Sprachansage
+- Tageslicht: Warnung, wenn die Ankunft nach Sonnenuntergang liegt
+- GPX: Export (Garmin, Wahoo, Freunde) über Teilen-Menü, Import eigener Tracks inkl. Navigation
+- Foto-Spots & Sammelpass: an Gipfeln, Aussichten, Burgen, Wasserfällen, Türmen, Seen meldet sich die App → Foto = Stempel; Stempel als Foto-Marker auf der Karte, Sammelpass mit „Foto-Jagd in deiner Nähe“, 7 neue Meilensteine „Fotojäger“
+- Web-Version per GitHub Pages (Workflow-Job `web`)
+
 **Fotorealistische Karte & Entdecken (v1.9)**
 - Fotomodus: Wegenetz auf dem Luftbild dezent (abschaltbar), ziehende Wolkenschatten auf dem 3D-Gelände (folgen dem Wind)
 - „Entdecken“ unter der Suche: Einkehr, Rad-Service, Rast/Wasser/WC, Übernachten, Erleben, Einkaufen – live aus OpenStreetMap als 3D-Pins mit Clustern

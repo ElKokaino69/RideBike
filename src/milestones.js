@@ -15,7 +15,8 @@ export const CATS = [
   { id: 'time', name: 'Tageszeit & Saison', color: '#a855f7' },
   { id: 'terrain', name: 'Gelände & Trails', color: '#16a34a' },
   { id: 'explore', name: 'Entdecken', color: '#06b6d4' },
-  { id: 'bike', name: 'Rad & Antrieb', color: '#eab308' }
+  { id: 'bike', name: 'Rad & Antrieb', color: '#eab308' },
+  { id: 'photo', name: 'Fotojäger', color: '#ec4899' }
 ];
 
 const maxOf = (o) => Object.values(o || {}).reduce((m, v) => Math.max(m, v), 0);
@@ -43,7 +44,17 @@ export function streakWeeks(weeks) {
 }
 
 // unit: km | hm | m | kmh | h | n | pct | scale
+const ph = (s) => s.photo || {};
 export const MILESTONES = [
+  // ---------------- Fotojäger (7) – Foto-Spots im Sammelpass
+  { id: 'ph_spots', cat: 'photo', icon: 'camera', name: 'Sammelpass', desc: 'Verschiedene Foto-Spots mit der App fotografiert', unit: 'n', t: [5, 25, 100], v: (s) => ph(s).spots },
+  { id: 'ph_peaks', cat: 'photo', icon: 'peaks', name: 'Gipfelfoto', desc: 'Gipfel fotografiert', unit: 'n', t: [1, 10, 30], v: (s) => ph(s).peaks },
+  { id: 'ph_castles', cat: 'photo', icon: 'shield', name: 'Burgenjäger', desc: 'Burgen und Ruinen fotografiert', unit: 'n', t: [1, 5, 15], v: (s) => ph(s).castles },
+  { id: 'ph_views', cat: 'photo', icon: 'eye', name: 'Weitblick', desc: 'Aussichtspunkte und -türme fotografiert', unit: 'n', t: [3, 15, 50], v: (s) => ph(s).views },
+  { id: 'ph_water', cat: 'photo', icon: 'wave', name: 'Wasserwelten', desc: 'Seen und Wasserfälle fotografiert', unit: 'n', t: [2, 10, 30], v: (s) => ph(s).water },
+  { id: 'ph_kinds', cat: 'photo', icon: 'medal', name: 'Vielfalt', desc: 'Verschiedene Spot-Arten fotografiert', unit: 'n', t: [3, 5, 8], v: (s) => ph(s).kinds },
+  { id: 'ph_day', cat: 'photo', icon: 'sun', name: 'Fotosafari', desc: 'Meiste neue Spots an einem Tag', unit: 'n', t: [3, 6, 10], v: (s) => ph(s).bestDay },
+
   // ---------------- Distanz (8)
   { id: 'total_km', cat: 'dist', icon: 'routeIc', name: 'Kilometerfresser', desc: 'Gesamtkilometer aller Fahrten', unit: 'km', t: [100, 1000, 5000], v: (s) => s.totalKm },
   { id: 'longest', cat: 'dist', icon: 'finish', name: 'Langstrecke', desc: 'Längste einzelne Tour', unit: 'km', t: [25, 50, 100], v: (s) => s.longestKm },
