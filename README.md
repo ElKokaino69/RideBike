@@ -15,6 +15,12 @@ App-ID: `de.enders.ridebike` · Capacitor 8 · MapLibre GL 5 · Vite
 - Animierter Kartenstart (Anflug zum Standort), leuchtende Radwege, fließende Routenlinie
 - Kompass, 2D/3D-Umschalter, Drehen und Neigen mit zwei Fingern
 
+**Neu in v2.1 – Planung auf Augenhöhe mit dem Marktführer**
+- Route per Ziehen: lang auf die Linie drücken (Touch) bzw. Linie greifen (Maus), an die Wunschstelle ziehen – mit Gummiband-Vorschau; ein Zwischenziel wird an der richtigen Stelle eingefügt
+- Mehrtagestour-Planer (ab 45 km): Etappen automatisch nach Kilometern *und* Höhenmetern (40–120 km/Tag), Übernachtungen (Hotel, Pension, Camping, Hütte) an den Etappenzielen per OpenStreetMap, nummerierte Etappenmarker, jede Etappe einzeln fahren
+- Wikipedia-Highlights: Sehenswürdigkeiten mit Wikipedia-/Wikidata-Eintrag zeigen Bild und Kurztext im Infoblatt und werden in „Unterwegs entdecken“ mit ★ markiert
+- Fix: Animierte Kartenmarker (Ladesäulen, Akku-Leer, Foto-Stempel) erscheinen jetzt an der richtigen Stelle
+
 **Marktvorteile (v2.0)**
 - Routen-Analyse: Untergrund (Asphalt/Pflaster/Schotter/Erde/Trail) und Wegarten (Radweg, ruhige Straße, Wirtschaftsweg, Pfad, Verkehr) aus BRouter-WayTags
 - Climb-Assistent: Anstiege mit Kategorie (Hügel … HC), Länge, Ø/max. Steigung, farbiges Mini-Profil; in der Navigation live „Noch 820 m · +58 m übrig“ mit Sprachansage
@@ -208,6 +214,7 @@ Im Browser testen: `npm run dev` → `http://localhost:5173` (GPS über die Brow
 | Radrouten/Trails | Overpass API | Fair-Use, Abfragen werden zwischengespeichert |
 | Overlays | Waymarked Trails, CyclOSM | Fair-Use |
 | Satellit | Esri World Imagery | Nutzungsbedingungen von Esri beachten |
+| Highlights | Wikipedia REST-API / Wikidata | Texte CC BY-SA 4.0, Quelle wird angezeigt |
 
 Kartendaten © OpenStreetMap-Mitwirkende, ODbL. Die Quellenangaben erscheinen in der Karte und unter „Kartenansicht → Info“.
 

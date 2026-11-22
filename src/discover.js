@@ -122,7 +122,8 @@ function toFeature(e, cats) {
       id: `${e.type}/${e.id}`, cat: cat.id, name: t.name || KIND_DE[kindKey] || cat.short, kind: KIND_DE[kindKey] || cat.short,
       open: oh, hours: t.opening_hours || '', phone: t.phone || t['contact:phone'] || '', web: t.website || t['contact:website'] || '',
       cuisine: t.cuisine || '', street: [t['addr:street'], t['addr:housenumber']].filter(Boolean).join(' '), city: t['addr:city'] || '',
-      outdoor: t.outdoor_seating === 'yes', fee: t.fee || '', ele: t.ele || '', stars: t.stars || '', partner: false
+      outdoor: t.outdoor_seating === 'yes', fee: t.fee || '', ele: t.ele || '', stars: t.stars || '', partner: false,
+      wiki: t.wikipedia || '', wikidata: t.wikidata || ''
     }
   };
 }

@@ -33,6 +33,8 @@ import { isEbike } from './bike.js';
 import { recordFlyover, shareVideo, videoSupported } from './video.js';
 import { routeWeather, bestStart, wmo, compass, windAt } from './weather.js';
 import { SURF, WAYS, climbSvg, gradeColor, toGpx, parseGpx } from './analysis.js';
+import { splitStages, findStays } from './stages.js';
+import { wikiSummary } from './wiki.js';
 import { routeFromCoords } from './routing.js';
 import { sunPosition } from './details.js';
 import { parseWish, wishLabel, generateLoop } from './tourwish.js';
@@ -125,7 +127,7 @@ async function boot() {
     setSetting('lastView', { center: [c.lng, c.lat], zoom: map.getZoom(), pitch: map.getPitch(), bearing: map.getBearing() });
   }, 1200));
 
-  if (/[?&]debug\b/.test(location.search)) window.__rb = { recordFlyover, simulate, wearStatus, photos, map, settings, setSetting, growTerrain, nav, route, loc, stats, rides, celebrate, showRideSummary };
+  if (/[?&]debug\b/.test(location.search)) window.__rb = { recordFlyover, simulate, wearStatus, photos, map, settings, setSetting, growTerrain, nav, route, loc, stats, rides, celebrate, showRideSummary, disc, toggleCat, showDiscInfo, closeSheet, plan: () => plan };
   // Quellenangabe kompakt starten (MapLibre klappt sie sonst anfangs auf)
   // Quellenangabe: kompakt, nur auf Antippen aufklappen (MapLibre klappt sie sonst selbst auf)
   document.addEventListener('click', (e) => {
@@ -590,16 +592,64 @@ let suppressClick = false;
 function wireMapInteraction() {
   let lpTimer = null, lpPoint = null;
   const clearLp = () => { clearTimeout(lpTimer); lpTimer = null; };
+  // Route per Ziehen anpassen: lang auf die Linie drücken (Touch) bzw. Linie greifen (Maus)
+  const onRouteAt = (pt) => route.data && plan.end && !nav.active && !isFlying() &&
+    map.queryRenderedFeatures([[pt.x - 14, pt.y - 14], [pt.x + 14, pt.y + 14]], { layers: ['rb-route-line', 'rb-route-casing'].filter((id) => map.getLayer(id)) }).length > 0;
+  let drag = null;
+  const startDrag = (lngLat) => {
+    const el = document.createElement('div');
+    el.className = 'drag-via'; el.innerHTML = '<i></i>';
+    drag = { grab: [lngLat.lng, lngLat.lat], last: lngLat, marker: new maplibregl.Marker({ element: el }).setLngLat(lngLat).addTo(map) };
+    // Gummiband-Vorschau: von ~600 m vor bis ~600 m nach dem Griffpunkt
+    const r = route.data, n = nearestOnLine(r.coords, r.cum, drag.grab);
+    const at = (m) => { let i = r.cum.findIndex((c) => c >= m); if (i < 0) i = r.cum.length - 1; return r.coords[i].slice(0, 2); };
+    drag.a = at(Math.max(0, n.along - 600)); drag.b = at(Math.min(r.total, n.along + 600));
+    if (!map.getSource('rb-drag')) {
+      map.addSource('rb-drag', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addLayer({ id: 'rb-drag', type: 'line', source: 'rb-drag', layout: { 'line-cap': 'round' }, paint: { 'line-color': '#8be13a', 'line-width': 4, 'line-dasharray': [1.2, 1.4], 'line-opacity': 0.95 } });
+    }
+    moveDrag(lngLat);
+    map.dragPan.disable();
+    if (navigator.vibrate) navigator.vibrate(18);
+    document.body.classList.add('route-dragging');
+  };
+  const moveDrag = (lngLat) => {
+    if (!drag) return; drag.last = lngLat; drag.marker.setLngLat(lngLat);
+    map.getSource('rb-drag')?.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: [drag.a, [lngLat.lng, lngLat.lat], drag.b] } });
+  };
+  const endDrag = () => {
+    if (!drag) return;
+    const d = drag; drag = null;
+    d.marker.remove(); map.dragPan.enable();
+    map.getSource('rb-drag')?.setData({ type: 'FeatureCollection', features: [] });
+    document.body.classList.remove('route-dragging');
+    const r = route.data;
+    const drop = [d.last.lng, d.last.lat];
+    if (Math.abs(drop[0] - d.grab[0]) + Math.abs(drop[1] - d.grab[1]) < 0.0002) return; // nicht bewegt
+    const a = nearestOnLine(r.coords, r.cum, d.grab).along;
+    const idx = plan.vias.filter((v) => nearestOnLine(r.coords, r.cum, v.lngLat).along < a).length;
+    plan.vias.splice(idx, 0, { lngLat: drop, label: 'Zwischenziel' });
+    plan.imported = false;
+    renderPlan(); syncMarkers(); recompute();
+    toast('Route angepasst – Zwischenziel eingefügt');
+  };
   map.on('touchstart', (e) => {
     clearLp();
     if (e.originalEvent.touches.length !== 1) return;
     lpPoint = e.point;
     const lngLat = e.lngLat;
+    if (onRouteAt(e.point)) { lpTimer = setTimeout(() => { suppressClick = true; startDrag(lngLat); }, 350); return; }
     lpTimer = setTimeout(() => { suppressClick = true; showContextMenu(lngLat); }, 550);
   });
-  map.on('touchmove', (e) => { if (lpPoint && Math.hypot(e.point.x - lpPoint.x, e.point.y - lpPoint.y) > 10) clearLp(); });
-  map.on('touchend', clearLp);
-  map.on('touchcancel', clearLp);
+  map.on('touchmove', (e) => {
+    if (drag) { e.preventDefault?.(); moveDrag(e.lngLat); return; }
+    if (lpPoint && Math.hypot(e.point.x - lpPoint.x, e.point.y - lpPoint.y) > 10) clearLp();
+  });
+  map.on('touchend', () => { clearLp(); endDrag(); });
+  map.on('touchcancel', () => { clearLp(); endDrag(); });
+  map.on('mousedown', (e) => { if (e.originalEvent.button === 0 && onRouteAt(e.point)) { e.preventDefault(); suppressClick = true; startDrag(e.lngLat); } });
+  map.on('mousemove', (e) => { if (drag) moveDrag(e.lngLat); else if (route.data && plan.end) map.getCanvas().style.cursor = onRouteAt(e.point) ? 'grab' : ''; });
+  map.on('mouseup', endDrag);
   map.on('contextmenu', (e) => showContextMenu(e.lngLat));
 
   map.on('click', (e) => {
@@ -891,6 +941,67 @@ function renderStats() {
   renderEbikeCard();
   renderWeatherCard();
   renderAlongCard();
+  renderStagesCard();
+}
+
+// ---------------------------------------------------------------------
+// Mehrtagestour: Etappen & Übernachtungen (Pro)
+// ---------------------------------------------------------------------
+let stageMarkers = [], stagePerDay = 70, stageRoute = null, stageList = null;
+function clearStageMarkers() { stageMarkers.forEach((m) => m.remove()); stageMarkers = []; }
+
+function renderStagesCard() {
+  const card = $('#stages-card');
+  const r = route.data;
+  if (!r || r.total < 45000 || nav.active) { card.hidden = true; clearStageMarkers(); stageRoute = null; return; }
+  card.hidden = false;
+  if (stageRoute !== r) { stageRoute = r; stageList = null; clearStageMarkers(); }
+  const list = stageList || splitStages(r, stagePerDay);
+  if (list.length < 2 && stagePerDay <= 70 && r.total < 80000) { card.hidden = true; clearStageMarkers(); return; }
+  const clock = (s) => fmtDur(estimateTime(s.km * 1000, s.asc));
+  card.innerHTML = `
+    <div class="al-head"><span class="al-ic">${ICON.calendar}</span><div class="eb-txt"><b>Mehrtagestour · ${list.length} ${list.length === 1 ? 'Tag' : 'Tage'}</b>
+      <small>Etappen nach Kilometern & Höhenmetern, mit Übernachtung</small></div><span class="pro-badge">PRO</span></div>
+    <div class="stg-per">${[40, 60, 70, 90, 120].map((k) => `<button data-per="${k}" class="${k === stagePerDay ? 'on' : ''}">${k} km</button>`).join('')}</div>
+    <div class="stg-list">${list.map((s, i) => `
+      <div class="stg">
+        <span class="stg-n">${i + 1}</span>
+        <div class="stg-txt"><b>Tag ${i + 1} · ${s.km.toFixed(0)} km · +${Math.round(s.asc)} m</b>
+          <small>${clock(s)} Fahrzeit${s.stay ? ` · 🛏 ${esc(s.stay.name)} (${s.stay.kind}${s.stay.off > 150 ? `, ${fmtDist(s.stay.off)} abseits` : ''})` : i < list.length - 1 ? ' · Übernachtung offen' : ' · Ziel'}</small></div>
+        <button class="btn tiny ghost" data-stage="${i}">Fahren</button>
+      </div>`).join('')}</div>
+    ${!stageList ? `<button class="btn ghost stg-find" id="stg-find">🛏 Unterkünfte an den Etappenzielen suchen</button>` : ''}`;
+  $$('#stages-card [data-per]').forEach((b) => b.onclick = () => { stagePerDay = +b.dataset.per; stageList = null; renderStagesCard(); });
+  $$('#stages-card [data-stage]').forEach((b) => b.onclick = () => startStage(list, +b.dataset.stage));
+  $('#stg-find')?.addEventListener('click', async () => {
+    $('#stg-find').disabled = true; $('#stg-find').textContent = 'Suche Unterkünfte…';
+    try { stageList = await findStays(r, list); if (route.data === r) renderStagesCard(); }
+    catch { toast('Unterkünfte gerade nicht abrufbar'); $('#stg-find').disabled = false; }
+  });
+  clearStageMarkers();
+  list.slice(0, -1).forEach((s, i) => {
+    const el = document.createElement('div');
+    el.className = 'stage-marker'; el.innerHTML = `<b>${i + 1}</b>${s.stay ? '<i>🛏</i>' : ''}`;
+    el.title = s.stay?.name || `Ende Tag ${i + 1}`;
+    stageMarkers.push(new maplibregl.Marker({ element: el }).setLngLat(r.coords[s.i1].slice(0, 2)).addTo(map));
+  });
+}
+
+function startStage(list, i) {
+  const full = route.data;
+  const s = list[i];
+  const coords = full.coords.slice(s.i0, s.i1 + 1);
+  const rr = routeFromCoords(coords);
+  routeSeq++;
+  plan.start = { gps: false, lngLat: coords[0].slice(0, 2), label: i === 0 ? (plan.start?.label || 'Start') : (list[i - 1].stay?.name || `Ende Tag ${i}`) };
+  plan.end = { lngLat: coords[coords.length - 1].slice(0, 2), label: s.stay?.name || (i === list.length - 1 ? plan.end.label : `Ende Tag ${i + 1}`) };
+  plan.vias = []; plan.imported = true; plan.wish = null;
+  clearStageMarkers();
+  renderPlan(); syncMarkers();
+  showRoute(rr, { padding: { top: 120, bottom: Math.min(window.innerHeight * 0.62, 470), left: 50, right: 50 } });
+  renderStats();
+  requestAnimationFrame(() => drawElevation($('#elev'), rr, onElevHover));
+  toast(`Etappe ${i + 1} geladen – ${fmtDist(rr.total)}`);
 }
 
 /** Hinweis, wenn die Ankunft nach Sonnenuntergang liegt */
@@ -1223,6 +1334,7 @@ function showDiscInfo(f) {
       ${p.phone ? `<button class="btn ghost" data-href="tel:${esc(p.phone.split(';')[0].replace(/\s/g, ''))}">Anrufen</button>` : ''}
       ${p.web ? `<button class="btn ghost" data-href="${esc(p.web.split(';')[0])}">Website</button>` : ''}
     </div>
+    ${p.wiki || p.wikidata ? `<div class="wiki-card loading" id="di-wiki"><div class="wk-shimmer"></div></div>` : ''}
     ${loc.pos && distM != null && distM < 150 ? `<button class="btn video-cta" id="di-photo">📸 <span>Foto-Stempel sammeln</span></button>` : ''}
     <div class="actions">
       ${plan.end ? `<button class="btn ghost" id="di-via">${ICON.plus}<span>Als Stopp</span></button>` : ''}
@@ -1230,6 +1342,14 @@ function showDiscInfo(f) {
     </div>`;
   $$('#info-body [data-href]').forEach((b) => b.onclick = () => window.open(b.dataset.href, '_blank'));
   $('#di-go').onclick = () => { closeSheet('sheet-info'); setDestination(ll, p.name); };
+  if (p.wiki || p.wikidata) wikiSummary(p).then((w) => {
+    const el = $('#di-wiki'); if (!el) return;
+    if (!w) { el.remove(); return; }
+    el.classList.remove('loading');
+    el.innerHTML = `${w.img ? `<img src="${esc(w.img)}" alt="" onerror="this.remove()">` : ''}<div class="wk-txt"><span class="wk-tag">★ Highlight · Wikipedia</span><b>${esc(w.title)}</b><p>${esc(w.text)}</p>
+      <button class="wk-more" data-url="${esc(w.url)}">Weiterlesen</button><small>Text: Wikipedia, CC BY-SA 4.0</small></div>`;
+    el.querySelector('.wk-more').onclick = () => window.open(w.url, '_blank');
+  });
   $('#di-photo')?.addEventListener('click', () => { closeSheet('sheet-info'); shootSpot({ id: p.id, name: p.name, kind: p.cat === 'see' ? 'sight' : 'sight', lngLat: ll }); });
   $('#di-via')?.addEventListener('click', () => { closeSheet('sheet-info'); plan.vias.push({ lngLat: ll, label: p.name }); renderPlan(); syncMarkers(); recompute(); openSheet('sheet-route'); toast(`${p.name} als Stopp eingefügt`); });
   closeSheet('sheet-route');
@@ -1260,12 +1380,12 @@ function renderAlongCard() {
       src?.setData({ type: 'FeatureCollection', features: list });
       const counts = DISC_CATS.map((c) => [c, list.filter((f) => f.properties.cat === c.id).length]).filter(([, n]) => n);
       card.innerHTML = `<div class="al-head"><span class="al-ic">${ICON.sparkle}</span><div class="eb-txt"><b>${list.length} Orte am Weg</b>
-        <small>${counts.map(([c, n]) => `${n} ${c.short}`).join(' · ') || 'Nichts gefunden'}</small></div></div>
+        <small>${counts.map(([c, n]) => `${n} ${c.short}`).join(' · ') || 'Nichts gefunden'}${list.some((f) => f.properties.wiki || f.properties.wikidata) ? ` · ★ ${list.filter((f) => f.properties.wiki || f.properties.wikidata).length} Highlights` : ''}</small></div></div>
         <div class="al-list">${list.slice(0, 14).map((f) => {
           const p = f.properties, c = catById(p.cat);
           return `<div class="al-item" data-id="${esc(p.id)}"><span class="al-km">${(p.atM / 1000).toFixed(1).replace('.', ',')} km</span>
             <span class="al-dot" style="background:${c.color}">${catIcon(c)}</span>
-            <span class="al-name"><b>${esc(p.name)}</b><small>${esc(p.kind)}${p.open === true ? ' · <em class="op">geöffnet</em>' : p.open === false ? ' · <em class="cl">geschlossen</em>' : ''}</small></span>
+            <span class="al-name"><b>${esc(p.name)}${p.wiki || p.wikidata ? ' <em class="hl">★</em>' : ''}</b><small>${esc(p.kind)}${p.open === true ? ' · <em class="op">geöffnet</em>' : p.open === false ? ' · <em class="cl">geschlossen</em>' : ''}</small></span>
             <button class="btn tiny ghost" data-stop="${esc(p.id)}">+ Stopp</button></div>`;
         }).join('')}</div>`;
       card.onclick = (e) => {
@@ -1558,7 +1678,7 @@ function wireFallAlarm() {
 function clearPlan() {
   $('#offline-card').hidden = true;
   routeSeq++;
-  plan.end = null; plan.vias = []; plan.wish = null; plan.loop = false; plan.imported = false; climbAnnounced = -1; plan.start = { gps: true, lngLat: null, label: 'Mein Standort' };
+  plan.end = null; plan.vias = []; plan.wish = null; plan.loop = false; plan.imported = false; climbAnnounced = -1; clearStageMarkers(); plan.start = { gps: true, lngLat: null, label: 'Mein Standort' };
   syncMarkers();
   clearRoute();
   elevMarker?.remove(); elevMarker = null;
