@@ -3,7 +3,7 @@
 
 export const APP = {
   name: 'RideBike',
-  version: '1.8.0',
+  version: '1.9.0',
   author: 'Florian Enders',
   year: 2026
 };
@@ -94,6 +94,8 @@ export const DEFAULT_SETTINGS = {
   sky: true,
   pitch: 70,
   skyFx: true,
+  cloudShadows: true,
+  subtleNetwork: true,
   hdTerrain: true,
   animations: true,
   daylight: true,          // Licht & Himmel nach Sonnenstand

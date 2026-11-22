@@ -15,6 +15,12 @@ App-ID: `de.enders.ridebike` · Capacitor 8 · MapLibre GL 5 · Vite
 - Animierter Kartenstart (Anflug zum Standort), leuchtende Radwege, fließende Routenlinie
 - Kompass, 2D/3D-Umschalter, Drehen und Neigen mit zwei Fingern
 
+**Fotorealistische Karte & Entdecken (v1.9)**
+- Fotomodus: Wegenetz auf dem Luftbild dezent (abschaltbar), ziehende Wolkenschatten auf dem 3D-Gelände (folgen dem Wind)
+- „Entdecken“ unter der Suche: Einkehr, Rad-Service, Rast/Wasser/WC, Übernachten, Erleben, Einkaufen – live aus OpenStreetMap als 3D-Pins mit Clustern
+- Infokarte: „Jetzt geöffnet“ aus den Öffnungszeiten, Adresse, Anrufen/Website, „Hierher fahren“, „Als Stopp“
+- Routenplaner: „Unterwegs entdecken“ – Orte im Korridor entlang der Route mit Kilometerangabe und „+ Stopp“
+
 **Abheben von gängigen Apps (v1.8)**
 - Tourwunsch in Alltagssprache: „2 h Gravel-Runde max 500 hm mit Café“ ins Suchfeld → Rundtour-Generator (3 Kandidaten via BRouter, Bewertung nach Distanz/Höhenmetern, Einkehr per Overpass, „Andere Variante“)
 - Wind & Wetter unterwegs: Open-Meteo zur Ankunftszeit an mehreren Routenpunkten, Anteil Rücken-/Gegenwind, Regenrisiko, beste Startzeit, „Richtung drehen“ bei Rundtouren; Rundtouren starten automatisch gegen den Wind

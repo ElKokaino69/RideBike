@@ -756,3 +756,49 @@ body.recording-video .map-hud, body.recording-video #fly-bar { opacity: 0; point
 .results .result > span:nth-child(2) { flex: 1; min-width: 0; }
 .results .result small, .results .result b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
 .result.wish .pro-badge { flex: none; }
+
+/* =====================================================================
+   v1.9 – Entdecken (Orte & Aktivitäten) + Fotomodus
+   ===================================================================== */
+.disc-bar { position: absolute; z-index: 9; left: 12px; right: 64px; top: calc(72px + var(--sat)); display: flex; align-items: flex-start; gap: 8px; pointer-events: none; }
+.disc-bar > * { pointer-events: auto; }
+.disc-toggle { flex: none; display: flex; align-items: center; gap: 7px; height: 36px; padding: 0 13px 0 9px; border-radius: 18px; font-weight: 800; font-size: 13px; color: #eef3f6;
+  background: rgba(14, 20, 28, .66); border: 1px solid rgba(255,255,255,.1); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
+.disc-toggle .dt-ic svg { width: 18px; height: 18px; color: var(--accent); }
+.disc-toggle.open { border-color: rgba(139,225,58,.6); }
+.disc-toggle.loading .dt-ic { animation: spin 1s linear infinite; }
+.dt-n { font-style: normal; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px; background: var(--grad); color: var(--on-accent); font-size: 11px; display: grid; place-items: center; }
+.disc-chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 4px; min-width: 0; }
+.disc-chips[hidden] { display: none; }
+.disc-chips::-webkit-scrollbar { display: none; }
+.disc-chips button { flex: none; display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px 0 6px; border-radius: 18px; font-weight: 700; font-size: 13px; color: #eef3f6;
+  background: rgba(14, 20, 28, .66); border: 1px solid rgba(255,255,255,.1); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); animation: mmIn .3s var(--spring) both; }
+.disc-chips button span { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: var(--c); color: #fff; }
+.disc-chips button span svg { width: 14px; height: 14px; }
+.disc-chips button.on { background: color-mix(in srgb, var(--c) 30%, rgba(14,20,28,.75)); border-color: var(--c); }
+body.navigating .disc-bar, body.legend-open .disc-bar, body.sheet-open .disc-bar, body.recording-video .disc-bar { opacity: 0; pointer-events: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.disc-facts { display: flex; flex-direction: column; gap: 7px; margin: 12px 0 4px; }
+.df { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.df span svg { width: 17px; height: 17px; color: var(--muted); }
+.df small { color: var(--muted); font-size: 13px; line-height: 1.35; }
+.df i { width: 10px; height: 10px; border-radius: 50%; margin: 0 4px 0 3px; }
+.df.open i { background: #22c55e; box-shadow: 0 0 10px #22c55e; } .df.open b { color: #4ade80; }
+.df.closed i { background: #ef4444; } .df.closed b { color: #fca5a5; }
+.disc-links { display: flex; gap: 8px; margin-top: 8px; } .disc-links .btn { flex: 1; }
+.info-badge svg { width: 22px; height: 22px; color: #fff; }
+
+.along-card { margin-top: 10px; padding: 12px; border-radius: 18px; background: var(--panel); border: 1px solid var(--line); animation: rowIn .35s var(--ease) both; }
+.al-head { display: flex; align-items: center; gap: 12px; }
+.al-ic { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: rgba(139,225,58,.14); color: var(--accent); flex: none; }
+.al-ic svg { width: 18px; height: 18px; }
+.al-list { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; max-height: 300px; overflow-y: auto; }
+.al-item { display: flex; align-items: center; gap: 9px; padding: 7px 4px; border-top: 1px solid var(--line); cursor: pointer; }
+.al-km { width: 46px; flex: none; font-size: 12px; font-weight: 800; color: var(--muted); text-align: right; }
+.al-dot { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; color: #fff; flex: none; }
+.al-dot svg { width: 14px; height: 14px; }
+.al-name { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.al-name b { font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.al-name small { font-size: 11.5px; color: var(--muted); }
+.al-name em { font-style: normal; } .al-name .op { color: #4ade80; } .al-name .cl { color: #fca5a5; }

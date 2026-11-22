@@ -295,6 +295,8 @@ function addBikeLayers(m) {
   const dark = isDarkStyle();
   const vis = (on) => (on ? 'visible' : 'none');
   const L = settings.layers;
+  // Fotomodus: Wegenetz auf dem Luftbild dezenter, damit das Foto wirkt
+  const soft = !!currentStyleDef().photo && settings.subtleNetwork !== false;
 
   m.addLayer({
     id: 'rb-cycleway-glow', type: 'line', ...src, minzoom: 11, filter: F_CYCLEWAY,
@@ -303,7 +305,7 @@ function addBikeLayers(m) {
       'line-color': C.cycleway,
       'line-width': ['interpolate', ['exponential', 1.5], ['zoom'], 11, 3, 14, 8, 18, 22],
       'line-blur': ['interpolate', ['linear'], ['zoom'], 11, 2, 18, 10],
-      'line-opacity': dark ? 0.45 : 0.3
+      'line-opacity': soft ? 0.16 : dark ? 0.45 : 0.3
     }
   }, before);
 
@@ -314,7 +316,7 @@ function addBikeLayers(m) {
       'line-color': C.path,
       'line-width': ['interpolate', ['linear'], ['zoom'], 13, 0.8, 18, 3],
       'line-dasharray': [0.6, 1.6],
-      'line-opacity': 0.9
+      'line-opacity': soft ? ['interpolate', ['linear'], ['zoom'], 13, 0, 14.5, 0.55] : 0.9
     }
   }, before);
 
@@ -325,7 +327,7 @@ function addBikeLayers(m) {
       'line-color': C.track,
       'line-width': ['interpolate', ['linear'], ['zoom'], 12, 0.8, 16, 2.4, 19, 5],
       'line-dasharray': [2.2, 1.2],
-      'line-opacity': 0.95
+      'line-opacity': soft ? ['interpolate', ['linear'], ['zoom'], 12, 0, 13.5, 0.6] : 0.95
     }
   }, before);
 
@@ -335,7 +337,7 @@ function addBikeLayers(m) {
     paint: {
       'line-color': dark ? '#000000' : '#ffffff',
       'line-width': ['interpolate', ['linear'], ['zoom'], 12, 2.4, 16, 5.5, 19, 9],
-      'line-opacity': 0.75
+      'line-opacity': soft ? 0.3 : 0.75
     }
   }, before);
   m.addLayer({
@@ -344,7 +346,8 @@ function addBikeLayers(m) {
     paint: {
       'line-color': mtbColor,
       'line-width': ['interpolate', ['linear'], ['zoom'], 12, 1.2, 16, 3, 19, 6],
-      'line-dasharray': [3, 1]
+      'line-dasharray': [3, 1],
+      'line-opacity': soft ? 0.8 : 1
     }
   }, before);
 
@@ -354,7 +357,7 @@ function addBikeLayers(m) {
     paint: {
       'line-color': dark ? '#04261a' : '#ffffff',
       'line-width': ['interpolate', ['exponential', 1.4], ['zoom'], 11, 1.8, 14, 3.6, 18, 10],
-      'line-opacity': 0.9
+      'line-opacity': soft ? 0.35 : 0.9
     }
   }, before);
   m.addLayer({
@@ -362,7 +365,8 @@ function addBikeLayers(m) {
     layout: { 'line-cap': 'round', 'line-join': 'round', visibility: vis(L.cycleways) },
     paint: {
       'line-color': C.cycleway,
-      'line-width': ['interpolate', ['exponential', 1.4], ['zoom'], 11, 1, 14, 2.2, 18, 6.5]
+      'line-width': ['interpolate', ['exponential', 1.4], ['zoom'], 11, soft ? 0.7 : 1, 14, soft ? 1.6 : 2.2, 18, 6.5],
+      'line-opacity': soft ? 0.85 : 1
     }
   }, before);
 }

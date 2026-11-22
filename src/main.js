@@ -25,6 +25,8 @@ import {
 } from './offline.js';
 import { ingestTrails } from './trails.js';
 import { initSky, applySkyFx } from './sky.js';
+import { initClouds, setCloudWind } from './clouds.js';
+import { CATS as DISC_CATS, disc, initDiscover, toggleCat, clearAlong, onDiscoverStatus, alongRoute, isOpen, hoursDe, refresh as refreshDiscover } from './discover.js';
 import { simulate, compareLevels, chargersNear, ASSIST, BATTERIES } from './ebike.js';
 import { isEbike } from './bike.js';
 import { recordFlyover, shareVideo, videoSupported } from './video.js';
@@ -125,6 +127,9 @@ async function boot() {
     if (btn) btn.parentElement.classList.toggle('rb-open');
   }, true);
   initSky();
+  initClouds();
+  initDiscover();
+  wireDiscover();
   map.on('rotate', updateCompass);
   map.on('pitch', update3dButton);
   map.once('load', () => {
@@ -217,6 +222,7 @@ function handleSettingChange(path) {
   else if (path === 'buildings') applyBuildings();
   else if (path === 'sky') { applySky(); applySkyFx(); }
   else if (path === 'skyFx') applySkyFx();
+  else if (path === 'subtleNetwork') switchStyle(settings.style);
   else if (path === 'hdTerrain') { swapDem(); toast(settings.hdTerrain ? 'HD-Gelände aktiv' : 'Standard-Gelände aktiv'); }
   else if (path === 'drift') noteInteraction();
   else if (path === 'autoNight') applySky();
@@ -300,6 +306,8 @@ function buildLayersSheet() {
     ${toggleRow('hillshade', ICON.mountain, 'Reliefschattierung', 'Schattiertes Gelände')}
     ${toggleRow('sky', ICON.globe, 'Himmel & Dunst', 'Atmosphäre am Horizont')}
     ${toggleRow('skyFx', ICON.cloud, 'Wolken & Sonne', 'Ziehende Wolken, Sonne mit Lichthof, Sterne bei Nacht')}
+    ${toggleRow('cloudShadows', ICON.cloud, 'Wolkenschatten', 'Schatten ziehender Wolken wandern über das Gelände')}
+    ${toggleRow('subtleNetwork', ICON.bike, 'Fotomodus', 'Wegenetz auf dem Luftbild dezent – das Foto steht im Vordergrund')}
     ${toggleRow('hdTerrain', ICON.peaks, 'HD-Gelände', 'Hochaufgelöstes Höhenmodell online (scharfe Grate & Täler)')}
 
     <div class="sec">Licht & Animation</div>
@@ -586,6 +594,15 @@ function wireMapInteraction() {
     if (nav.active || isFlying()) return;
     $('#results').hidden = true;
     const box = [[e.point.x - 12, e.point.y - 12], [e.point.x + 12, e.point.y + 12]];
+    if (map.getLayer('rb-disc')) {
+      const dh = map.queryRenderedFeatures(box, { layers: ['rb-disc', 'rb-disc-cluster'] });
+      if (dh.length) {
+        const f = dh[0];
+        if (f.properties.cluster) map.easeTo({ center: f.geometry.coordinates, zoom: Math.min(17, map.getZoom() + 2), duration: 600 });
+        else showDiscInfo(disc.data.get(f.properties.id) || f);
+        return;
+      }
+    }
     const trailLayers = ['rb-trails', 'rb-trails-casing'].filter((id) => map.getLayer(id));
     const trailHit = trailLayers.length ? map.queryRenderedFeatures(box, { layers: trailLayers }) : [];
     if (trailHit.length) { showTrailInfo(trailHit[0].properties.id); return; }
@@ -859,6 +876,112 @@ function renderStats() {
   else $('#st-asc').textContent = '–';
   renderEbikeCard();
   renderWeatherCard();
+  renderAlongCard();
+}
+
+// ---------------------------------------------------------------------
+// Entdecken: Einkehr, Rad-Service, Übernachten, Erleben, Einkaufen, Rast
+// ---------------------------------------------------------------------
+const catById = (id) => DISC_CATS.find((c) => c.id === id);
+const catIcon = (c) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${c.path}"/></svg>`;
+
+function wireDiscover() {
+  $('#disc-toggle .dt-ic').innerHTML = ICON.sparkle;
+  const chips = $('#disc-chips');
+  chips.innerHTML = DISC_CATS.map((c) => `<button data-cat="${c.id}" style="--c:${c.color}"><span>${catIcon(c)}</span>${c.short}</button>`).join('');
+  $('#disc-toggle').onclick = () => {
+    const open = chips.hidden;
+    chips.hidden = !open;
+    $('#disc-toggle').classList.toggle('open', open);
+  };
+  chips.onclick = (e) => {
+    const b = e.target.closest('[data-cat]'); if (!b) return;
+    const on = toggleCat(b.dataset.cat);
+    b.classList.toggle('on', on);
+    if (on && map.getZoom() < 11.5) toast('Zum Anzeigen etwas hineinzoomen');
+  };
+  onDiscoverStatus((st) => {
+    const n = $('#disc-n');
+    $('#disc-toggle').classList.toggle('loading', !!st.loading);
+    if (st.count != null) { n.hidden = !st.count; n.textContent = st.count > 99 ? '99+' : st.count; }
+    if (st.error) toast('Orte gerade nicht abrufbar');
+  });
+}
+
+function showDiscInfo(f) {
+  const p = f.properties || {};
+  const c = catById(p.cat) || DISC_CATS[0];
+  const ll = f.geometry.coordinates;
+  const open = p.open ?? (p.hours ? isOpen(p.hours) : null);
+  const distM = loc.pos ? Math.round(Math.hypot((ll[0] - loc.pos[0]) * 111000 * Math.cos(ll[1] * Math.PI / 180), (ll[1] - loc.pos[1]) * 111000)) : null;
+  const meta = [p.kind, p.cuisine && p.cuisine.split(';')[0].replace(/_/g, ' '), p.stars && '★'.repeat(Math.min(5, +p.stars || 0)), p.ele && `${p.ele} m`, distM != null && fmtDist(distM)].filter(Boolean).join(' · ');
+  $('#info-body').innerHTML = `
+    <div class="info-head">
+      <div class="info-badge" style="background:${c.color}">${catIcon(c)}</div>
+      <div><h3>${esc(p.name)}</h3><small>${esc(meta)}</small></div>
+    </div>
+    <div class="disc-facts">
+      ${open != null ? `<div class="df ${open ? 'open' : 'closed'}"><i></i><b>${open ? 'Jetzt geöffnet' : 'Gerade geschlossen'}</b></div>` : ''}
+      ${p.hours ? `<div class="df"><span>${ICON.clock}</span><small>${esc(hoursDe(p.hours))}</small></div>` : ''}
+      ${p.street || p.city ? `<div class="df"><span>${ICON.pin}</span><small>${esc([p.street, p.city].filter(Boolean).join(', '))}</small></div>` : ''}
+      ${p.outdoor ? `<div class="df"><span>${ICON.sun}</span><small>Mit Außenplätzen</small></div>` : ''}
+      ${p.fee === 'no' ? `<div class="df"><span>${ICON.check}</span><small>Kostenlos</small></div>` : ''}
+    </div>
+    <div class="disc-links">
+      ${p.phone ? `<button class="btn ghost" data-href="tel:${esc(p.phone.split(';')[0].replace(/\s/g, ''))}">Anrufen</button>` : ''}
+      ${p.web ? `<button class="btn ghost" data-href="${esc(p.web.split(';')[0])}">Website</button>` : ''}
+    </div>
+    <div class="actions">
+      ${plan.end ? `<button class="btn ghost" id="di-via">${ICON.plus}<span>Als Stopp</span></button>` : ''}
+      <button class="btn primary" id="di-go">${ICON.nav}<span>Hierher fahren</span></button>
+    </div>`;
+  $$('#info-body [data-href]').forEach((b) => b.onclick = () => window.open(b.dataset.href, '_blank'));
+  $('#di-go').onclick = () => { closeSheet('sheet-info'); setDestination(ll, p.name); };
+  $('#di-via')?.addEventListener('click', () => { closeSheet('sheet-info'); plan.vias.push({ lngLat: ll, label: p.name }); renderPlan(); syncMarkers(); recompute(); openSheet('sheet-route'); toast(`${p.name} als Stopp eingefügt`); });
+  closeSheet('sheet-route');
+  openSheet('sheet-info');
+}
+
+// Entlang der Route: was liegt am Weg?
+let alongRouteRef = null;
+function renderAlongCard() {
+  const card = $('#along-card');
+  const r = route.data;
+  if (!r || !isOnline()) { card.hidden = true; if (alongRouteRef) { alongRouteRef = null; clearAlong(); } return; }
+  card.hidden = false;
+  if (alongRouteRef === r && card.dataset.loaded) return;
+  if (alongRouteRef && alongRouteRef !== r) clearAlong();
+  alongRouteRef = r; card.dataset.loaded = '';
+  card.innerHTML = `<div class="al-head"><span class="al-ic">${ICON.sparkle}</span><div class="eb-txt"><b>Unterwegs entdecken</b><small>Einkehr, Rad-Service, Wasser & Sehenswertes am Weg</small></div>
+    <button class="btn tiny" id="al-load">Anzeigen</button></div>`;
+  $('#al-load').onclick = async () => {
+    $('#al-load').disabled = true; $('#al-load').textContent = 'Suche…';
+    try {
+      const list = await alongRoute(r);
+      if (route.data !== r) return;
+      card.dataset.loaded = '1';
+      const src = map.getSource('rb-disc');
+      disc.along = true;
+      list.forEach((f) => disc.data.set(f.properties.id, f));
+      src?.setData({ type: 'FeatureCollection', features: list });
+      const counts = DISC_CATS.map((c) => [c, list.filter((f) => f.properties.cat === c.id).length]).filter(([, n]) => n);
+      card.innerHTML = `<div class="al-head"><span class="al-ic">${ICON.sparkle}</span><div class="eb-txt"><b>${list.length} Orte am Weg</b>
+        <small>${counts.map(([c, n]) => `${n} ${c.short}`).join(' · ') || 'Nichts gefunden'}</small></div></div>
+        <div class="al-list">${list.slice(0, 14).map((f) => {
+          const p = f.properties, c = catById(p.cat);
+          return `<div class="al-item" data-id="${esc(p.id)}"><span class="al-km">${(p.atM / 1000).toFixed(1).replace('.', ',')} km</span>
+            <span class="al-dot" style="background:${c.color}">${catIcon(c)}</span>
+            <span class="al-name"><b>${esc(p.name)}</b><small>${esc(p.kind)}${p.open === true ? ' · <em class="op">geöffnet</em>' : p.open === false ? ' · <em class="cl">geschlossen</em>' : ''}</small></span>
+            <button class="btn tiny ghost" data-stop="${esc(p.id)}">+ Stopp</button></div>`;
+        }).join('')}</div>`;
+      card.onclick = (e) => {
+        const st = e.target.closest('[data-stop]');
+        if (st) { const f = disc.data.get(st.dataset.stop); plan.vias.push({ lngLat: f.geometry.coordinates, label: f.properties.name }); renderPlan(); syncMarkers(); recompute(); toast(`${f.properties.name} als Stopp eingefügt`); return; }
+        const it = e.target.closest('.al-item');
+        if (it) { const f = disc.data.get(it.dataset.id); map.easeTo({ center: f.geometry.coordinates, zoom: 15.5, duration: 800 }); }
+      };
+    } catch { $('#al-load').disabled = false; $('#al-load').textContent = 'Erneut'; toast('Orte gerade nicht abrufbar'); }
+  };
 }
 
 // ---------------------------------------------------------------------
@@ -885,6 +1008,7 @@ async function renderWeatherCard() {
     const loop = plan.end && plan.start && !plan.start.gps && plan.end.lngLat === plan.start.lngLat || plan.loop;
     const pct = (x) => Math.round(x * 100);
     const s0 = w.samples[0];
+    setCloudWind(s0.dir);
     const clock = (t) => new Date(t).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
     card.innerHTML = `
       <div class="wx-head"><span class="wx-sky">${sky.icon}</span>
