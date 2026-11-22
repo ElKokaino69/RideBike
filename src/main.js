@@ -966,8 +966,8 @@ function renderStagesCard() {
     <div class="stg-list">${list.map((s, i) => `
       <div class="stg">
         <span class="stg-n">${i + 1}</span>
-        <div class="stg-txt"><b>Tag ${i + 1} · ${s.km.toFixed(0)} km · +${Math.round(s.asc)} m</b>
-          <small>${clock(s)} Fahrzeit${s.stay ? ` · 🛏 ${esc(s.stay.name)} (${s.stay.kind}${s.stay.off > 150 ? `, ${fmtDist(s.stay.off)} abseits` : ''})` : i < list.length - 1 ? ' · Übernachtung offen' : ' · Ziel'}</small></div>
+        <div class="stg-txt"><b>Tag ${i + 1}<span class="stg-stats">${s.km.toFixed(0)} km · ↑ ${Math.round(s.asc)} m · ${clock(s)}</span></b>
+          <small>${s.stay ? `🛏 ${esc(s.stay.name)} · ${s.stay.kind}${s.stay.off > 150 ? `, ${fmtDist(s.stay.off)} abseits` : ''}` : i < list.length - 1 ? 'Übernachtung offen' : '🏁 Ziel'}</small></div>
         <button class="btn tiny ghost" data-stage="${i}">Fahren</button>
       </div>`).join('')}</div>
     ${!stageList ? `<button class="btn ghost stg-find" id="stg-find">🛏 Unterkünfte an den Etappenzielen suchen</button>` : ''}`;
@@ -1426,8 +1426,8 @@ async function renderWeatherCard() {
     const clock = (t) => new Date(t).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
     card.innerHTML = `
       <div class="wx-head"><span class="wx-sky">${sky.icon}</span>
-        <div class="eb-txt"><b>${Math.round(w.tMin)}${Math.round(w.tMax) !== Math.round(w.tMin) ? '–' + Math.round(w.tMax) : ''} °C · ${sky.text}${w.maxPop >= 20 ? ` · Regenrisiko ${w.maxPop} %` : ' · trocken'}</b>
-        <small>Wind ${Math.round(s0.wind)} km/h aus ${compass(s0.dir)}${w.maxGust > 30 ? ` · Böen ${Math.round(w.maxGust)}` : ''} · Start ${cur.h === 0 ? 'jetzt' : clock(cur.at)}</small></div>
+        <div class="eb-txt"><b class="wx-title"><span class="wx-t">${Math.round(w.tMin)}${Math.round(w.tMax) !== Math.round(w.tMin) ? '–' + Math.round(w.tMax) : ''}°</span><span class="wx-s">${sky.text}</span></b>
+        <small>${w.maxPop >= 20 ? `🌧 ${w.maxPop} %` : 'trocken'} · Wind ${Math.round(s0.wind)} km/h ${compass(s0.dir)}${w.maxGust > 30 ? ` · Böen ${Math.round(w.maxGust)}` : ''} · Start ${cur.h === 0 ? 'jetzt' : clock(cur.at)}</small></div>
         <span class="pro-badge">PRO</span></div>
       <div class="wx-wind"><i class="t" style="width:${pct(w.tailShare)}%"></i><i class="s" style="width:${100 - pct(w.tailShare) - pct(w.headShare)}%"></i><i class="h" style="width:${pct(w.headShare)}%"></i></div>
       <div class="wx-legend"><span class="t">${pct(w.tailShare)} % Rückenwind</span><span class="h">${pct(w.headShare)} % Gegenwind</span></div>

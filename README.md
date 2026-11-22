@@ -15,6 +15,12 @@ App-ID: `de.enders.ridebike` · Capacitor 8 · MapLibre GL 5 · Vite
 - Animierter Kartenstart (Anflug zum Standort), leuchtende Radwege, fließende Routenlinie
 - Kompass, 2D/3D-Umschalter, Drehen und Neigen mit zwei Fingern
 
+**Neu in v2.2 – optischer Feinschliff**
+- Planer-Karten einheitlich mit Tiefe, Wetter mit großer Temperatur, Etappen kompakt in einer Zeile
+- Chip-Reihen laufen weich aus, Suche sprengt die Leiste nicht mehr, Startleiste mit Unschärfe-Verlauf
+- Spürbares Druckfeedback auf allen Knöpfen, Meilenstein-Namen ohne Silbentrennung
+- Echte Vorschaubilder per GitHub Actions (Workflow „RideBike Vorschaubilder“, Branch `screens`)
+
 **Neu in v2.1 – Planung auf Augenhöhe mit dem Marktführer**
 - Route per Ziehen: lang auf die Linie drücken (Touch) bzw. Linie greifen (Maus), an die Wunschstelle ziehen – mit Gummiband-Vorschau; ein Zwischenziel wird an der richtigen Stelle eingefügt
 - Mehrtagestour-Planer (ab 45 km): Etappen automatisch nach Kilometern *und* Höhenmetern (40–120 km/Tag), Übernachtungen (Hotel, Pension, Camping, Hütte) an den Etappenzielen per OpenStreetMap, nummerierte Etappenmarker, jede Etappe einzeln fahren

@@ -3,7 +3,7 @@
 
 export const APP = {
   name: 'RideBike',
-  version: '2.1.0',
+  version: '2.2.0',
   author: 'Florian Enders',
   year: 2026
 };
