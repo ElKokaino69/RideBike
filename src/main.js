@@ -966,8 +966,8 @@ function renderStagesCard() {
     <div class="stg-list">${list.map((s, i) => `
       <div class="stg">
         <span class="stg-n">${i + 1}</span>
-        <div class="stg-txt"><b>Tag ${i + 1}<span class="stg-stats">${s.km.toFixed(0)} km · ↑ ${Math.round(s.asc)} m · ${clock(s)}</span></b>
-          <small>${s.stay ? `🛏 ${esc(s.stay.name)} · ${s.stay.kind}${s.stay.off > 150 ? `, ${fmtDist(s.stay.off)} abseits` : ''}` : i < list.length - 1 ? 'Übernachtung offen' : '🏁 Ziel'}</small></div>
+        <div class="stg-txt"><b>Tag ${i + 1}<span class="stg-stats">${s.km.toFixed(0)} km · ↑ ${Math.round(s.asc)} m</span></b>
+          <small>${clock(s)} · ${s.stay ? `🛏 ${esc(s.stay.name)} · ${s.stay.kind}${s.stay.off > 150 ? `, ${fmtDist(s.stay.off)} abseits` : ''}` : i < list.length - 1 ? 'Übernachtung offen' : '🏁 Ziel'}</small></div>
         <button class="btn tiny ghost" data-stage="${i}">Fahren</button>
       </div>`).join('')}</div>
     ${!stageList ? `<button class="btn ghost stg-find" id="stg-find">🛏 Unterkünfte an den Etappenzielen suchen</button>` : ''}`;

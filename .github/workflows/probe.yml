@@ -1,0 +1,10 @@
+name: Dienste prüfen
+on: workflow_dispatch
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          B='https://brouter.de/brouter?lonlats=10.005000,50.402000|9.979986,50.370069&alternativeidx=0&format=geojson'
+          for q in "&profile=trekking&timode=2" "&profile=trekking" "&profile=trekking&timode=2&profile:totalMass=96&profile:maxSpeed=45&profile:C_r=0.0077&profile:S_C_x=0.45&profile:bikerPower=110&profile:avoid_unsafe=true&profile:stick_to_cycleroutes=true&profile:consider_elevation=true&profile:allow_steps=false"; do
+            echo "== $q"; curl -s -w '\nHTTP %{http_code}\n' "$B$q" | head -c 400; echo; done

@@ -53,10 +53,12 @@ export async function calcRoute(points) {
   try {
     return await calcRouteWith(points, req.profile, req.params);
   } catch (e) {
-    // Falls ein Spezialprofil (gravel/mtb) auf dem Server fehlt → Trekking als Rückfall
-    if (req.profile !== 'trekking' && /profile|not found|unknown/i.test(String(e.message))) {
-      return await calcRouteWith(points, 'trekking', {});
+    if (/abort/i.test(String(e?.name || e?.message))) throw e;
+    // Server lehnt Radparameter ab oder hat einen Fehler → ohne Parameter, dann Trekking als Rückfall
+    if (Object.keys(req.params).length) {
+      try { return await calcRouteWith(points, req.profile, {}); } catch { /* weiter */ }
     }
+    if (req.profile !== 'trekking') return await calcRouteWith(points, 'trekking', {});
     throw e;
   }
 }
