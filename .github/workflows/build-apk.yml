@@ -1,0 +1,51 @@
+# RideBike – APK automatisch bei GitHub bauen (Actions → "RideBike APK" → Artefakt herunterladen)
+# © 2026 Florian Enders
+name: RideBike APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: android-actions/setup-android@v3
+
+      - name: Web-App bauen
+        run: |
+          npm ci
+          npm run build
+
+      - name: Android-Projekt anlegen & synchronisieren
+        run: |
+          [ -d android ] || npx cap add android
+          node scripts/android-setup.mjs
+          npx capacitor-assets generate --android --iconBackgroundColor '#070b10' --splashBackgroundColor '#070b10'
+          npx cap sync android
+
+      - name: Debug-APK bauen
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: APK umbenennen
+        run: |
+          V=$(node -p "require('./package.json').version")
+          cp android/app/build/outputs/apk/debug/app-debug.apk "RideBike-$V-debug.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RideBike-APK
+          path: RideBike-*-debug.apk

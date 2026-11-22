@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#0a1016" />
+  <meta name="author" content="Florian Enders" />
+  <meta name="copyright" content="© 2026 Florian Enders" />
+  <title>RideBike</title>
+  <link rel="icon" href="./logo.svg" type="image/svg+xml" />
+</head>
+<body>
+  <!-- RideBike © 2026 Florian Enders. Alle Rechte vorbehalten. -->
+
+  <!-- Startbildschirm -->
+  <div id="splash">
+    <div class="splash-sky"></div>
+    <svg class="splash-ridge back" viewBox="0 0 400 200" preserveAspectRatio="none" aria-hidden="true"><path d="M0 200 L0 120 L60 70 L110 110 L170 40 L230 100 L290 55 L350 95 L400 60 L400 200 Z"/></svg>
+    <svg class="splash-ridge front" viewBox="0 0 400 200" preserveAspectRatio="none" aria-hidden="true"><path d="M0 200 L0 150 L80 100 L140 140 L210 85 L270 130 L330 95 L400 135 L400 200 Z"/></svg>
+    <svg class="splash-trail" viewBox="0 0 400 800" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+      <path d="M200 820 C 140 700, 300 640, 220 560 S 120 470, 210 420" />
+    </svg>
+    <div class="splash-center">
+      <img class="splash-peaks" src="./peaks.svg" alt="" />
+      <h1 class="wordmark"><span class="w1">Ride</span><span class="w2">Bike</span></h1>
+      <div class="badge3d">3D</div>
+      <p class="tagline">Entdecken. Planen. Navigieren.</p>
+    </div>
+    <div class="splash-foot">© 2026 Florian Enders · Kartendaten © OpenStreetMap</div>
+  </div>
+
+  <div id="map"></div>
+  <div id="night-tint"></div>
+  <div id="sun-glow"></div>
+  <div id="style-fade"></div>
+
+  <!-- Suche -->
+  <header class="topbar">
+    <div class="searchbar glass">
+      <span class="s-ic" id="s-ic"></span>
+      <input id="q" type="search" placeholder="Wohin geht's?" autocomplete="off" enterkeyhint="search" />
+      <button id="q-clear" class="icon-btn small" aria-label="Leeren" hidden></button>
+    </div>
+    <button id="btn-locate" class="locate-btn round glass" aria-label="Mein Standort"></button>
+    <div id="results" class="results glass" hidden></div>
+    <div id="net-chip" class="chip glass offline-chip" hidden></div>
+    <div id="trail-status" class="chip glass" hidden></div>
+  </header>
+
+  <!-- Legende Radwege & Trails -->
+  <aside id="legend-panel" class="legend-panel" hidden>
+    <div class="lg-card glass lg-list">
+      <div><i style="--c:#5fd12f"></i>Radwege</div>
+      <div><i style="--c:#3b82f6"></i>Wald- &amp; Feldwege</div>
+      <div><i style="--c:#facc15" class="dash"></i>Pfade</div>
+      <div><i style="--c:#ef4444"></i>MTB-Trails</div>
+    </div>
+    <div class="lg-card glass lg-mtbcard">
+      <button class="lg-mtb" id="lg-mtb"></button>
+      <div class="lg-scale" id="lg-scale"></div>
+    </div>
+  </aside>
+
+  <!-- Schnellaktionen -->
+  <button id="btn-compass" class="compass-btn round glass" aria-label="Nach Norden ausrichten"><span class="needle"></span></button>
+
+  <div class="fab-col">
+    <button id="btn-3d" class="fab round glass label" aria-label="2D/3D umschalten">3D</button>
+    <button id="btn-style" class="fab round glass" aria-label="Kartenstil & Ebenen"></button>
+    <button id="btn-plan" class="fab round glass" aria-label="Route planen"></button>
+    <div class="more-wrap">
+      <button id="btn-more" class="fab round glass" aria-label="Mehr"><span class="trophy-dot" id="trophy-dot" hidden></span></button>
+      <div class="more-menu" id="more-menu" hidden>
+        <button id="btn-legend"><span class="mm-ic"></span><span>Radwege &amp; Trails</span></button>
+        <button id="btn-layers"><span class="mm-ic"></span><span>Kartenansicht</span></button>
+        <button id="btn-offline"><span class="mm-ic"></span><span>Offline-Karten</span></button>
+        <button id="btn-trophy"><span class="mm-ic"></span><span>Meilensteine</span></button>
+        <button id="btn-rec"><span class="mm-ic rec-core"></span><span id="rec-label">Fahrt aufzeichnen</span></button>
+      </div>
+    </div>
+  </div>
+  <div class="zoom-col">
+    <button id="zoom-in" class="fab round glass" aria-label="Hineinzoomen"></button>
+    <button id="zoom-out" class="fab round glass" aria-label="Herauszoomen"></button>
+  </div>
+
+  <!-- Karten-HUD -->
+  <div id="map-hud" class="map-hud">
+    <div class="hud-chip glass" id="hud-ele-chip"><span class="hc-ic" id="hud-ele-ic"></span><div><b id="hud-ele">–</b><small id="hud-ele-sub"></small></div></div>
+    <div class="hud-chip glass" id="hud-dist-chip" hidden><span class="hc-ic" id="hud-dist-ic"></span><div><b id="hud-dist">–</b><small>Strecke</small></div></div>
+    <div class="hud-chip glass" id="hud-time-chip" hidden><span class="hc-ic" id="hud-time-ic"></span><div><b id="hud-time">–</b><small>Fahrzeit</small></div></div>
+  </div>
+
+  <!-- Routenplanung -->
+  <section id="sheet-route" class="sheet glass">
+    <div class="sheet-handle"><i></i></div>
+    <div class="sheet-head">
+      <button id="rp-back" class="icon-btn" aria-label="Zurück"></button>
+      <h2>Route planen</h2>
+      <button id="rp-close" class="icon-btn" aria-label="Schließen"></button>
+    </div>
+    <div class="plan-list">
+      <div class="plan-row" id="row-start"><span class="rp-dot start"></span><button id="rp-start" class="rp-field">Mein Standort</button><span class="chev"></span></div>
+      <div id="rp-vias"></div>
+      <div class="plan-row" id="row-end"><span class="rp-flag" id="rp-flag"></span><button id="rp-end" class="rp-field">Ziel wählen</button><span class="chev"></span></div>
+      <div class="plan-row add" id="row-via"><span class="rp-plus" id="rp-plus"></span><button id="rp-addvia" class="rp-field">Via-Punkt hinzufügen</button><button id="rp-swap" class="icon-btn small" aria-label="Start und Ziel tauschen"></button></div>
+    </div>
+    <div class="profile-row" id="profile-row">
+      <span class="pr-ic" id="pr-ic"></span><span class="pr-lbl">Fahrradprofil</span>
+      <button class="pr-chip" id="pr-chip"></button>
+      <div class="pr-menu glass" id="pr-menu" hidden></div>
+    </div>
+    <div id="profiles" class="profiles" hidden></div>
+    <div class="sheet-body">
+      <div id="route-loading" class="route-loading" hidden><span class="spinner"></span>Route wird berechnet…</div>
+      <div id="route-error" class="route-error" hidden></div>
+      <div class="chart-card">
+        <div id="route-stats" class="stats3"></div>
+        <div class="elev-wrap">
+          <canvas id="elev"></canvas>
+          <div id="elev-tip" class="elev-tip" hidden></div>
+        </div>
+      </div>
+    </div>
+    <div id="offline-card" class="offline-card" hidden>
+      <span class="oc-ic" id="oc-ic"></span>
+      <div class="oc-txt">
+        <b id="oc-title"></b>
+        <small id="oc-sub"></small>
+        <div class="oc-bar" id="oc-bar" hidden><i id="oc-fill"></i></div>
+      </div>
+      <button id="oc-btn" class="btn tiny"></button>
+    </div>
+    <div class="actions">
+      <button id="btn-fly" class="btn ghost round-btn" aria-label="3D-Flyover"></button>
+      <button id="btn-go" class="btn primary"></button>
+    </div>
+  </section>
+
+  <!-- Info (Trail / Weg) -->
+  <section id="sheet-info" class="sheet glass">
+    <div class="sheet-handle"><i></i></div>
+    <div id="info-body"></div>
+  </section>
+
+  <!-- Kartenstil -->
+  <section id="sheet-style" class="sheet glass">
+    <div class="sheet-handle"><i></i></div>
+    <div class="sheet-head">
+      <span></span>
+      <h2>Kartenstil</h2>
+      <button id="style-close" class="icon-btn" aria-label="Schließen"></button>
+    </div>
+    <div id="style-body"></div>
+  </section>
+
+  <!-- Kartenansicht & Ebenen -->
+  <section id="sheet-layers" class="sheet glass tall">
+    <div class="sheet-handle"><i></i></div>
+    <div class="sheet-head">
+      <span></span>
+      <h2>Kartenansicht</h2>
+      <button id="layers-close" class="icon-btn" aria-label="Schließen"></button>
+    </div>
+    <div id="layers-body" class="scroll"></div>
+  </section>
+
+  <!-- Mein Rad -->
+  <section id="sheet-bike" class="sheet glass tall">
+    <div class="sheet-handle"><i></i></div>
+    <div class="sheet-head">
+      <button id="bike-close" class="icon-btn" aria-label="Zurück"></button>
+      <h2>Mein Rad</h2>
+      <button id="bike-save" class="text-btn">Speichern</button>
+    </div>
+    <div id="bike-body" class="scroll"></div>
+  </section>
+
+  <!-- Offline-Karten -->
+  <section id="sheet-offline" class="sheet glass tall">
+    <div class="sheet-handle"><i></i></div>
+    <div class="sheet-head">
+      <span></span>
+      <h2>Offline-Karten</h2>
+      <button id="offline-close" class="icon-btn" aria-label="Schließen"></button>
+    </div>
+    <div id="offline-body" class="scroll"></div>
+  </section>
+
+  <div id="dialog" class="dialog-wrap" hidden>
+    <div class="dialog glass">
+      <div class="dlg-ic" id="dlg-ic"></div>
+      <h3 id="dlg-title"></h3>
+      <p id="dlg-text"></p>
+      <div class="oc-bar" id="dlg-bar" hidden><i id="dlg-fill"></i></div>
+      <label class="dlg-check" id="dlg-check-wrap" hidden><input type="checkbox" id="dlg-check"><span id="dlg-check-label"></span></label>
+      <div class="dlg-actions" id="dlg-actions"></div>
+    </div>
+  </div>
+
+  <!-- Navigation -->
+  <div id="nav-hud" hidden>
+    <div class="nav-top">
+      <div class="nav-main glass-strong" id="nav-main">
+        <div id="nav-icon" class="nav-icon"></div>
+        <div class="nav-txt">
+          <div id="nav-dist" class="nav-dist">–</div>
+          <div id="nav-instr" class="nav-instr">Warte auf GPS…</div>
+        </div>
+        <span id="nav-badge" class="nav-badge" hidden></span>
+      </div>
+      <div id="nav-then" class="nav-then" hidden></div>
+    </div>
+    <div class="nav-side">
+      <button id="nav-voice" class="nfab glass" aria-label="Sprachansagen"></button>
+      <button id="nav-3d" class="nfab glass label" aria-label="2D/3D">3D</button>
+      <button id="nav-recenter" class="nfab glass" aria-label="Zentrieren"></button>
+    </div>
+    <button id="nav-stop" class="nav-stop glass" aria-label="Navigation beenden"></button>
+    <div id="nav-reroute" class="nav-reroute glass" hidden><span class="spinner"></span>Route wird neu berechnet…</div>
+    <div class="nav-bottom">
+      <div class="nav-tile glass"><span class="nt-ic" id="nt-speed-ic"></span><b><span id="nav-speed">0</span><em>km/h</em></b></div>
+      <div class="nav-tile glass"><span class="nt-ic" id="nt-dist-ic"></span><b id="nav-remain">–</b></div>
+      <div class="nav-tile glass"><span class="nt-ic" id="nt-time-ic"></span><b id="nav-left">–</b><small id="nav-eta" class="nav-eta">Ankunft –</small></div>
+    </div>
+  </div>
+
+  <!-- Freie Fahrt (Aufzeichnung) -->
+  <div id="ride-hud" hidden>
+    <div class="ride-pill glass">
+      <span class="rec-dot"></span><b id="ride-clock">00:00</b><span class="rp-sep"></span><span id="ride-asc">+0 hm</span>
+      <button id="ride-stop" class="ride-stop" aria-label="Fahrt beenden"></button>
+    </div>
+    <div class="nav-bottom">
+      <div class="nav-tile glass"><span class="nt-ic" id="rt-speed-ic"></span><b id="ride-speed">0</b><small>km/h</small></div>
+      <div class="nav-tile glass"><span class="nt-ic" id="rt-dist-ic"></span><b id="ride-km">0,0 km</b><small>Strecke</small></div>
+      <div class="nav-tile glass"><span class="nt-ic" id="rt-max-ic"></span><b id="ride-max">0</b><small>max km/h</small></div>
+    </div>
+  </div>
+  <div id="ms-banner" class="ms-banner glass" hidden></div>
+
+  <!-- Meilensteine -->
+  <section id="sheet-ms" class="sheet glass tall">
+    <div class="sheet-handle"><i></i></div>
+    <div class="sheet-head">
+      <span></span>
+      <h2>Meilensteine</h2>
+      <button id="ms-close" class="icon-btn" aria-label="Schließen"></button>
+    </div>
+    <div id="ms-body" class="scroll"></div>
+  </section>
+
+  <!-- Fahrt-Zusammenfassung -->
+  <section id="sheet-ride" class="sheet glass tall">
+    <div class="sheet-handle"><i></i></div>
+    <div class="sheet-head">
+      <span></span>
+      <h2 id="ride-title">Fahrt beendet</h2>
+      <button id="ride-close" class="icon-btn" aria-label="Schließen"></button>
+    </div>
+    <div id="ride-body" class="scroll"></div>
+  </section>
+
+  <!-- Meilenstein-Detail -->
+  <div id="ms-detail" class="ms-detail-wrap" hidden><div class="ms-detail glass" id="ms-detail-card"></div></div>
+
+  <!-- Feier beim Freischalten -->
+  <div id="celebrate" class="celebrate" hidden>
+    <canvas id="confetti"></canvas>
+    <div class="cel-card">
+      <div class="cel-rays"></div>
+      <div class="cel-medal" id="cel-medal"></div>
+      <div class="cel-tier" id="cel-tier"></div>
+      <h3 id="cel-name"></h3>
+      <p id="cel-desc"></p>
+      <div class="cel-count" id="cel-count"></div>
+      <button id="cel-next" class="btn primary">Weiter</button>
+    </div>
+  </div>
+
+  <div id="fly-bar" class="fly-bar glass" hidden>
+    <span class="rec"></span>3D-Flyover
+    <button id="fly-stop" class="btn tiny">Beenden</button>
+  </div>
+
+  <div id="toast" role="status"></div>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

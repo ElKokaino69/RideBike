@@ -1,0 +1,22 @@
+{
+  "appId": "de.enders.ridebike",
+  "appName": "RideBike",
+  "webDir": "www",
+  "android": {
+    "backgroundColor": "#070b10",
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 600,
+      "launchAutoHide": true,
+      "backgroundColor": "#070b10",
+      "showSpinner": false,
+      "androidScaleType": "CENTER_CROP"
+    },
+    "SystemBars": {
+      "style": "DARK",
+      "insetsHandling": "css"
+    }
+  }
+}

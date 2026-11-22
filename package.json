@@ -1,0 +1,40 @@
+{
+  "name": "ridebike",
+  "version": "1.6.0",
+  "private": true,
+  "description": "RideBike – 3D-Fahrradnavigation auf Basis von OpenStreetMap. © 2026 Florian Enders",
+  "author": "Florian Enders",
+  "license": "UNLICENSED",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview --host",
+    "android:setup": "node scripts/android-setup.mjs",
+    "assets": "capacitor-assets generate --android",
+    "sync": "npm run build && npx cap sync android",
+    "open": "npx cap open android",
+    "build:single": "node scripts/build-single.mjs"
+  },
+  "dependencies": {
+    "@capacitor-community/keep-awake": "^8.0.1",
+    "@capacitor-community/text-to-speech": "^8.0.2",
+    "@capacitor/android": "^8.6.2",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/core": "^8.6.2",
+    "@capacitor/geolocation": "^8.2.5",
+    "@capacitor/haptics": "^8.0.2",
+    "@capacitor/network": "^8.0.1",
+    "@capacitor/preferences": "^8.0.1",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@fontsource-variable/inter": "^5.3.0",
+    "maplibre-contour": "^0.1.1",
+    "maplibre-gl": "^5.24.1"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^4.0.0",
+    "@capacitor/cli": "^8.6.2",
+    "vite": "^7.3.8",
+    "vite-plugin-singlefile": "^2.3.4"
+  }
+}
