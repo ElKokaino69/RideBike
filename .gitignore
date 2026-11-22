@@ -4,3 +4,4 @@ android/
 *.apk
 .DS_Store
 dist-single/
+docs/
