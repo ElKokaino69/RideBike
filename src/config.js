@@ -3,7 +3,7 @@
 
 export const APP = {
   name: 'RideBike',
-  version: '1.7.0',
+  version: '1.8.0',
   author: 'Florian Enders',
   year: 2026
 };
@@ -54,6 +54,9 @@ export const DEM_HD = {
 
 /** Ersatzteil-Suche für den Wartungs-Tracker – hier später die Partner-ID (Affiliate) eintragen */
 export const PARTS_SHOP = 'https://www.bike-components.de/de/s/?keywords={q}';
+
+/** Wetter: Open-Meteo (frei für nicht-kommerzielle Nutzung; für den Verkauf Abo/Kundenendpunkt eintragen) */
+export const WEATHER_API = 'https://api.open-meteo.com/v1/forecast';
 
 export const WAYMARKED = {
   cycling: 'https://tile.waymarkedtrails.org/cycling/{z}/{x}/{y}.png',
@@ -122,6 +125,7 @@ export const DEFAULT_SETTINGS = {
   bike: null, // wird in settings.js mit DEFAULT_BIKE gefüllt
   slopeColors: false,
   voice: true,
+  safety: { fall: true, name: '', phone: '', share: true },
   keepAwake: true,
   lastView: null
 };

@@ -28,6 +28,9 @@ import { initSky, applySkyFx } from './sky.js';
 import { simulate, compareLevels, chargersNear, ASSIST, BATTERIES } from './ebike.js';
 import { isEbike } from './bike.js';
 import { recordFlyover, shareVideo, videoSupported } from './video.js';
+import { routeWeather, bestStart, wmo, compass, windAt } from './weather.js';
+import { parseWish, wishLabel, generateLoop } from './tourwish.js';
+import { startFallDetection, stopFallDetection, emergencyText, openSms, callNumber, locationLink } from './safety.js';
 import { loadWear, addRide as wearAddRide, status as wearStatus, resetPart, dueCount, shopUrl, addManualKm } from './wear.js';
 import { MILESTONES, CATS as MS_CATS, TIERS, evaluate, medalCounts, fmtValue, progress, tierOf } from './milestones.js';
 import { stats, rides, loadStats, initRecorder, rec, onRecord, startRide, finishRide, markArrived, liveUnlocks, countFlyover, rideElevationRoute } from './rides.js';
@@ -91,7 +94,7 @@ async function boot() {
   buildLegend();
   wireHud();
   updateQualityNote();
-  ['sheet-route', 'sheet-info', 'sheet-layers', 'sheet-bike', 'sheet-offline', 'sheet-style'].forEach((id) => enableSheetDrag(document.getElementById(id)));
+  ['sheet-route', 'sheet-info', 'sheet-layers', 'sheet-bike', 'sheet-offline', 'sheet-style', 'sheet-safety'].forEach((id) => enableSheetDrag(document.getElementById(id)));
   wireOffline();
   wireMilestones();
   ['sheet-ms', 'sheet-ride'].forEach((id) => enableSheetDrag(document.getElementById(id)));
@@ -154,6 +157,8 @@ function injectIcons() {
   set('#s-ic', ICON.search);
   set('#btn-offline .mm-ic', ICON.cloud);
   set('#btn-mybike .mm-ic', ICON.bike);
+  set('#btn-safety .mm-ic', ICON.shield);
+  set('#safety-close', ICON.chevL);
   set('#btn-plan', ICON.navArrow);
   set('#btn-more', ICON.dots + ($('#btn-more').innerHTML || ''));
   set('#offline-close', ICON.close);
@@ -464,6 +469,9 @@ function wireFabs() {
   $('#btn-more').onclick = (e) => { e.stopPropagation(); setMore(menu.hidden); };
   menu.addEventListener('click', () => setTimeout(() => setMore(false), 120));
   $('#btn-mybike').onclick = () => openSheet('sheet-bike');
+  $('#btn-safety').onclick = () => { renderSafety(); openSheet('sheet-safety'); };
+  $('#safety-close').onclick = () => closeSheet('sheet-safety');
+  wireFallAlarm();
   // PRO-Abzeichen erklären (Beta: alles frei – Abo folgt über Google Play)
   document.addEventListener('click', (e) => {
     if (!e.target.closest('.pro-badge')) return;
@@ -520,23 +528,28 @@ function wireSearch() {
     const term = q.value.trim();
     if (term.length < 2) { res.hidden = true; return; }
     const my = ++seq;
+    const wish = parseWish(term);
+    const wishHtml = wish ? `<button class="result wish" data-wish="1"><span class="ri">${ICON.sparkle}</span><span><b>Rundtour vorschlagen</b><small>${esc(wishLabel(wish, bikeSummary().kmh))}</small></span><span class="pro-badge">PRO</span></button>` : '';
+    if (wish) { res.innerHTML = wishHtml; res.hidden = false; res.onclick = (e) => { if (e.target.closest('[data-wish]')) { res.hidden = true; q.blur(); runWish(wish); } }; }
     try {
       const near = loc.pos || [map.getCenter().lng, map.getCenter().lat];
       const items = await searchPlaces(term, near);
       if (my !== seq) return;
-      res.innerHTML = items.length
+      res.innerHTML = wishHtml + (items.length
         ? items.map((it, i) => `<button class="result" data-i="${i}"><span class="ri">${placeIcon(it.kind)}</span><span><b>${esc(it.name)}</b><small>${esc(it.sub)}</small></span></button>`).join('')
-        : '<div class="empty">Keine Treffer</div>';
+        : wish ? '' : '<div class="empty">Keine Treffer</div>');
       res.hidden = false;
       res.onclick = (e) => {
         const b = e.target.closest('.result');
         if (!b) return;
+        if (b.dataset.wish) { res.hidden = true; q.blur(); runWish(wish); return; }
         const it = items[Number(b.dataset.i)];
         res.hidden = true;
         q.blur();
         setDestination(it.lngLat, it.name);
       };
     } catch {
+      if (my === seq && wish) return;
       if (my === seq) { res.innerHTML = `<div class="empty">${isOnline() ? 'Suche gerade nicht erreichbar' : 'Offline – Suche braucht Internet. Lang auf die Karte drücken, um ein Ziel zu setzen, oder eine gespeicherte Tour öffnen.'}</div>`; res.hidden = false; }
     }
   }, 320);
@@ -803,6 +816,7 @@ function renderPlan() {
   s.textContent = `Start: ${plan.start.gps ? 'Mein Standort' : plan.start.label}`;
   s.classList.toggle('gps', plan.start.gps);
   $('#rp-end').textContent = plan.end ? `Ziel: ${plan.end.label}` : 'Ziel wählen';
+  $('#wish-row').hidden = !plan.wish;
   $('#rp-vias').innerHTML = plan.vias.map((v, i) => `
     <div class="rp-row"><span class="rp-dot via"></span><button class="rp-field">Via: ${esc(v.label)}</button><button class="rp-x" data-del="${i}">${ICON.close}</button></div>`).join('');
   const t = bikeType();
@@ -844,6 +858,50 @@ function renderStats() {
   if (r.hasEle) countUp($('#st-asc'), r.ascent, (v) => `+${Math.round(v)} m`);
   else $('#st-asc').textContent = '–';
   renderEbikeCard();
+  renderWeatherCard();
+}
+
+// ---------------------------------------------------------------------
+// Wind & Wetter unterwegs (Pro)
+// ---------------------------------------------------------------------
+let wxSeq = 0;
+let wxStart = 0; // 0 = jetzt, sonst Zeitstempel
+let wxRoute = null;
+async function renderWeatherCard() {
+  const card = $('#weather-card');
+  const r = route.data;
+  const my = ++wxSeq;
+  if (!r || !isOnline()) { card.hidden = true; card.innerHTML = ''; return; }
+  if (r !== wxRoute) { wxRoute = r; card.innerHTML = ''; }
+  card.hidden = false;
+  if (!card.innerHTML) card.innerHTML = '<div class="wx-load"><span class="spinner"></span>Wetter unterwegs wird geladen…</div>';
+  try {
+    const starts = await bestStart(r);
+    if (my !== wxSeq) return;
+    const best = starts.reduce((a, b) => (b.score < a.score ? b : a));
+    const cur = starts.find((x) => (wxStart ? x.at === wxStart : x.h === 0)) || starts[0];
+    const w = cur.w;
+    const sky = wmo(w.code);
+    const loop = plan.end && plan.start && !plan.start.gps && plan.end.lngLat === plan.start.lngLat || plan.loop;
+    const pct = (x) => Math.round(x * 100);
+    const s0 = w.samples[0];
+    const clock = (t) => new Date(t).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    card.innerHTML = `
+      <div class="wx-head"><span class="wx-sky">${sky.icon}</span>
+        <div class="eb-txt"><b>${Math.round(w.tMin)}${Math.round(w.tMax) !== Math.round(w.tMin) ? '–' + Math.round(w.tMax) : ''} °C · ${sky.text}${w.maxPop >= 20 ? ` · Regenrisiko ${w.maxPop} %` : ' · trocken'}</b>
+        <small>Wind ${Math.round(s0.wind)} km/h aus ${compass(s0.dir)}${w.maxGust > 30 ? ` · Böen ${Math.round(w.maxGust)}` : ''} · Start ${cur.h === 0 ? 'jetzt' : clock(cur.at)}</small></div>
+        <span class="pro-badge">PRO</span></div>
+      <div class="wx-wind"><i class="t" style="width:${pct(w.tailShare)}%"></i><i class="s" style="width:${100 - pct(w.tailShare) - pct(w.headShare)}%"></i><i class="h" style="width:${pct(w.headShare)}%"></i></div>
+      <div class="wx-legend"><span class="t">${pct(w.tailShare)} % Rückenwind</span><span class="h">${pct(w.headShare)} % Gegenwind</span></div>
+      <div class="wx-starts">${starts.map((x) => `<button data-wx="${x.at}" data-h="${x.h}" class="${x === cur ? 'on' : ''} ${x === best ? 'best' : ''}">
+        <b>${x.h === 0 ? 'Jetzt' : clock(x.at).replace(':00', ' Uhr')}</b><small>${x.w.maxPop >= 30 ? '🌧️ ' + x.w.maxPop + ' %' : pct(x.w.tailShare) >= pct(x.w.headShare) ? '↗ Rückenw.' : '↙ Gegenw.'}</small></button>`).join('')}</div>
+      ${best !== cur ? `<div class="eb-tip">Beste Startzeit: <b>${best.h === 0 ? 'jetzt' : clock(best.at)}</b>${best.w.maxPop < cur.w.maxPop - 15 ? ' – trockener' : ''}${best.w.headShare < cur.w.headShare - 0.15 ? ' – weniger Gegenwind' : ''}</div>` : ''}
+      ${loop && w.headShare > w.tailShare + 0.15 ? `<div class="eb-tip">Andersherum fährst du mehr mit Rückenwind. <button class="btn tiny" id="wx-reverse">Richtung drehen</button></div>` : ''}`;
+    $$('#weather-card [data-wx]').forEach((b) => b.onclick = () => { wxStart = +b.dataset.h === 0 ? 0 : +b.dataset.wx; renderWeatherCard(); });
+    $('#wx-reverse')?.addEventListener('click', () => { plan.vias.reverse(); renderPlan(); syncMarkers(); recompute(); toast('Richtung gedreht'); });
+  } catch {
+    if (my === wxSeq) card.innerHTML = '<div class="wx-load">Wetter gerade nicht verfügbar</div>';
+  }
 }
 
 // ---------------------------------------------------------------------
@@ -957,10 +1015,128 @@ function addVia(lngLat, label) {
   renderPlan(); syncMarkers(); recompute();
 }
 
+// ---------------------------------------------------------------------
+// Tourwunsch → Rundtour (Pro)
+// ---------------------------------------------------------------------
+const KIND_BIKE = { gravel: 'gravel', mtb: 'mtb', road: 'road' };
+async function runWish(wish, seed = 0) {
+  const want = KIND_BIKE[wish.kind];
+  const cur = settings.bike.type;
+  if (want && cur !== want && !(want === 'mtb' && cur === 'emtb') && !(want === 'road' && cur === 'speed')) selectBikeType(want);
+  const start = loc.pos || [map.getCenter().lng, map.getCenter().lat];
+  const my = ++routeSeq;
+  plan.start = { gps: !!loc.pos, lngLat: loc.pos ? null : start, label: loc.pos ? 'Mein Standort' : 'Kartenmitte' };
+  plan.end = { lngLat: start, label: 'Rundtour' };
+  plan.vias = []; plan.loop = true; plan.wish = wish; plan.wishSeed = seed;
+  renderPlan(); syncMarkers();
+  openSheet('sheet-route');
+  $('#route-error').hidden = true;
+  $('#route-loading').hidden = false;
+  const lt = $('#route-loading');
+  const setStep = (t) => { lt.lastChild.textContent = t; };
+  $('#btn-go').disabled = true; $('#btn-fly').disabled = true; $('#btn-video').disabled = true;
+  try {
+    let wind = null;
+    try { if (isOnline()) wind = await windAt(start); } catch { /* ohne Wind */ }
+    const best = await generateLoop(start, wish, { calc: (pts) => calcRoute(pts), kmh: bikeSummary().kmh, wind, seed, onStep: setStep });
+    if (my !== routeSeq) return;
+    plan.vias = best.wps.map((p, i) => ({ lngLat: p, label: best.poi && i === 1 ? (best.poi.name || 'Einkehr') : `Rundtour-Punkt ${i + 1}` }));
+    plan.end.label = `Rundtour · ${wishLabel(wish, bikeSummary().kmh)}`;
+    renderPlan(); syncMarkers();
+    showRoute(best.r, { padding: { top: 120, bottom: Math.min(window.innerHeight * 0.62, 470), left: 50, right: 50 } });
+    renderStats();
+    requestAnimationFrame(() => drawElevation($('#elev'), best.r, onElevHover));
+    $('#btn-go').disabled = false; $('#btn-fly').disabled = false; $('#btn-video').disabled = false;
+    updateOfflineCard();
+    toast(best.windAware ? 'Rundtour: erst gegen den Wind, heimwärts mit Rückenwind' : `Rundtour mit ${fmtDist(best.r.total)} gefunden`);
+  } catch (e) {
+    if (my !== routeSeq) return;
+    $('#route-error').textContent = isOnline() ? 'Keine passende Rundtour gefunden – andere Variante probieren.' : 'Offline – Rundtouren brauchen Internet.';
+    $('#route-error').hidden = false;
+  } finally {
+    if (my === routeSeq) { $('#route-loading').hidden = true; setStep('Route wird berechnet…'); }
+  }
+}
+
+// ---------------------------------------------------------------------
+// Sicherheit: Sturzerkennung & Notfall (Pro)
+// ---------------------------------------------------------------------
+function armSafety() {
+  startFallDetection({ onAlarm: () => showFallAlarm(), speed: () => (loc.speed || 0) * 3.6 });
+}
+
+function renderSafety() {
+  const sf = settings.safety;
+  $('#safety-body').innerHTML = `
+    <label class="row"><span class="ic">${ICON.shield}</span><span class="lbl"><b>Sturzerkennung</b><small>Während Aufzeichnung & Navigation: harter Aufprall + Stillstand → Alarm mit 30 s Countdown</small></span>
+      <span class="switch"><input type="checkbox" id="sf-fall" ${sf.fall ? 'checked' : ''}><span></span></span></label>
+    <div class="sec">Notfallkontakt</div>
+    <div class="sf-fields">
+      <input id="sf-name" placeholder="Name (z. B. Anna)" value="${esc(sf.name || '')}" autocomplete="name">
+      <input id="sf-phone" type="tel" placeholder="Handynummer (z. B. +49 170 …)" value="${esc(sf.phone || '')}" autocomplete="tel">
+    </div>
+    <div class="sf-actions">
+      <button class="btn primary" id="sf-share">${ICON.locate}Standort jetzt teilen</button>
+      <button class="btn ghost" id="sf-test">Alarm testen</button>
+    </div>
+    <p class="hint">Bei einem erkannten Sturz öffnet RideBike eine SMS an deinen Kontakt mit deinem Standort – du musst sie nur noch absenden, falls du kannst. Im Ernstfall immer zuerst <b>112</b> wählen.</p>`;
+  $('#sf-fall').onchange = (e) => { settings.safety.fall = e.target.checked; saveSettings(); };
+  const savePerson = () => { settings.safety.name = $('#sf-name').value.trim(); settings.safety.phone = $('#sf-phone').value.trim(); saveSettings(); };
+  $('#sf-name').onchange = savePerson; $('#sf-phone').onchange = savePerson;
+  $('#sf-share').onclick = () => shareLocation();
+  $('#sf-test').onclick = () => { closeSheet('sheet-safety'); showFallAlarm(true); };
+}
+
+async function shareLocation() {
+  const pos = loc.pos || [map.getCenter().lng, map.getCenter().lat];
+  let text = emergencyText(pos, 'share');
+  if (route.data && nav.active) text += ` – unterwegs nach ${plan.end?.label || 'Ziel'}`;
+  try {
+    if (Capacitor.isNativePlatform()) {
+      const { Share } = await import('@capacitor/share');
+      await Share.share({ title: 'Mein Standort', text, url: locationLink(pos), dialogTitle: 'Standort teilen' });
+    } else if (navigator.share) await navigator.share({ title: 'Mein Standort', text });
+    else { await navigator.clipboard.writeText(text); toast('Standort-Link kopiert'); }
+  } catch { /* abgebrochen */ }
+}
+
+let faTimer = 0;
+function showFallAlarm(test = false) {
+  const el = $('#fall-alarm');
+  if (!el.hidden) return;
+  el.hidden = false; el.classList.toggle('test', test);
+  let n = 30;
+  const arc = $('#fa-arc'), C = 2 * Math.PI * 54;
+  arc.style.strokeDasharray = C;
+  $('#fa-text').textContent = test ? 'Test: So sieht der Alarm aus. Ohne Antwort würde dein Notfallkontakt benachrichtigt.'
+    : `Ist alles in Ordnung? Ohne Antwort wird ${settings.safety.name || 'dein Notfallkontakt'} mit deinem Standort benachrichtigt.`;
+  const tick = () => {
+    $('#fa-count').textContent = n;
+    arc.style.strokeDashoffset = C * (1 - n / 30);
+    if (navigator.vibrate) navigator.vibrate([400, 200, 400]);
+    if (n % 10 === 0 && !test) speak?.('Sturz erkannt. Ist alles in Ordnung?');
+    if (n-- <= 0) { clearInterval(faTimer); hideFallAlarm(); if (!test) sendHelp(); else toast('Test beendet – im Ernstfall öffnet sich jetzt die Notfall-SMS'); }
+  };
+  tick();
+  faTimer = setInterval(tick, 1000);
+}
+function hideFallAlarm() { clearInterval(faTimer); $('#fall-alarm').hidden = true; }
+function sendHelp() {
+  const pos = loc.pos;
+  const text = emergencyText(pos, 'fall');
+  if (settings.safety.phone) openSms(settings.safety.phone, text);
+  else shareLocation();
+}
+function wireFallAlarm() {
+  $('#fa-ok').onclick = () => { hideFallAlarm(); toast('Gut – weiter geht\'s!'); };
+  $('#fa-help').onclick = () => { const test = $('#fall-alarm').classList.contains('test'); hideFallAlarm(); if (!test) sendHelp(); else toast('Test: hier würde die Notfall-SMS geöffnet'); };
+  $('#fa-112').onclick = () => { hideFallAlarm(); callNumber('112'); };
+}
+
 function clearPlan() {
   $('#offline-card').hidden = true;
   routeSeq++;
-  plan.end = null; plan.vias = []; plan.start = { gps: true, lngLat: null, label: 'Mein Standort' };
+  plan.end = null; plan.vias = []; plan.wish = null; plan.loop = false; plan.start = { gps: true, lngLat: null, label: 'Mein Standort' };
   syncMarkers();
   clearRoute();
   elevMarker?.remove(); elevMarker = null;
@@ -1076,6 +1252,7 @@ function wireRoutePlanner() {
   };
   $('#fly-stop').onclick = () => { stopFlyover(); endFly(); };
   $('#vid-cancel').onclick = () => vidAbort?.abort();
+  $('#wish-again').onclick = () => { if (plan.wish) runWish(plan.wish, (plan.wishSeed || 0) + 1); };
   $('#btn-video').onclick = () => makeVideo({ title: plan.end?.label ? `Tour nach ${plan.end.label}` : 'Meine Tour in 3D' });
   $('#btn-go').onclick = beginNavigation;
   window.addEventListener('resize', debounce(() => { if (route.data) drawElevation($('#elev'), route.data, onElevHover); }, 200));
@@ -1796,6 +1973,7 @@ async function startFreeRide() {
   const ok = await startLocation();
   if (!ok) { toast('Für die Aufzeichnung wird der Standort benötigt'); return; }
   startRide('free');
+  armSafety();
   document.body.classList.add('recording');
   $('#rec-label').textContent = 'Aufzeichnung beenden';
   $('#ride-hud').hidden = false;
@@ -1814,6 +1992,7 @@ async function startFreeRide() {
 }
 
 function stopFreeRide(showSummary = true) {
+  stopFallDetection();
   clearInterval(rideTimer);
   document.body.classList.remove('recording');
   $('#rec-label').textContent = 'Fahrt aufzeichnen';
@@ -2172,6 +2351,7 @@ async function beginNavigation() {
   navUi.update({ m: first, distTo: first.d, next: null, remaining: route.data.total, speed: 0, eta: new Date(Date.now() + route.data.time * 1000), onRoute: true });
   if (rec.active && rec.ride?.mode === 'free') stopFreeRide(false);
   startRide('nav');
+  armSafety();
   try {
     await startNavigation(plan.end.lngLat, plan.vias.map((v) => v.lngLat), navUi);
   } finally {
@@ -2181,6 +2361,7 @@ async function beginNavigation() {
 
 function endNavigation() {
   arrivedOnce = false;
+  stopFallDetection();
   stopNavigation();
   const result = finishRide();
   onRideWear(result);
@@ -2227,7 +2408,7 @@ function wireBackButton() {
     if (!$('#dialog').hidden) return;
     if (!$('#celebrate').hidden) { showNextCelebration(); return; }
     if (!$('#ms-detail').hidden) { $('#ms-detail').hidden = true; return; }
-    for (const id of ['sheet-ride', 'sheet-ms', 'sheet-style', 'sheet-offline', 'sheet-bike', 'sheet-layers', 'sheet-info', 'sheet-route']) {
+    for (const id of ['sheet-safety', 'sheet-ride', 'sheet-ms', 'sheet-style', 'sheet-offline', 'sheet-bike', 'sheet-layers', 'sheet-info', 'sheet-route']) {
       if (isSheetOpen(id)) { closeSheet(id); if (id === 'sheet-info') selectTrail(null); return; }
     }
     App.minimizeApp();

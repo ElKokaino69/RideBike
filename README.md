@@ -15,6 +15,12 @@ App-ID: `de.enders.ridebike` · Capacitor 8 · MapLibre GL 5 · Vite
 - Animierter Kartenstart (Anflug zum Standort), leuchtende Radwege, fließende Routenlinie
 - Kompass, 2D/3D-Umschalter, Drehen und Neigen mit zwei Fingern
 
+**Abheben von gängigen Apps (v1.8)**
+- Tourwunsch in Alltagssprache: „2 h Gravel-Runde max 500 hm mit Café“ ins Suchfeld → Rundtour-Generator (3 Kandidaten via BRouter, Bewertung nach Distanz/Höhenmetern, Einkehr per Overpass, „Andere Variante“)
+- Wind & Wetter unterwegs: Open-Meteo zur Ankunftszeit an mehreren Routenpunkten, Anteil Rücken-/Gegenwind, Regenrisiko, beste Startzeit, „Richtung drehen“ bei Rundtouren; Rundtouren starten automatisch gegen den Wind
+- Sicherheit: Sturzerkennung (Aufprall + Stillstand) mit 30-s-Alarm, Notfall-SMS mit Standort an Kontakt, 112-Knopf, Standort teilen
+- Hinweis: Open-Meteo ist nur für nicht-kommerzielle Nutzung frei – vor dem Verkauf Abo abschließen und `WEATHER_API` in `config.js` anpassen
+
 **Pro-Funktionen (v1.7, in der Beta frei)**
 - E-Bike-Reichweite: Akku-Simulation entlang der Route (Steigung, Gewicht, Roll-/Luftwiderstand, Abregelgrenze), Vergleich Eco/Tour/Sport/Turbo, Warnung mit Punkt „Akku leer“, Ladestationen in der Nähe (Overpass)
 - Wartungs-Tracker: Kette, Kassette, Bremsbeläge, Reifen, Inspektion – Fahrten zählen automatisch (Gelände & E-Bike beschleunigen Verschleiß), Hinweise bei 90 %, „Teil finden“-Link (Partner-ID in `config.js` → `PARTS_SHOP`)

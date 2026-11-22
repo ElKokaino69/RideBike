@@ -706,3 +706,53 @@ body.recording-video .map-hud, body.recording-video #fly-bar { opacity: 0; point
 #sheet-route > * { flex-shrink: 0; }
 #sheet-route > .actions { position: sticky; bottom: 0; z-index: 3; padding-top: 10px; padding-bottom: 4px;
   background: linear-gradient(to bottom, transparent, var(--sheet-bg, rgba(12,17,24,.96)) 30%); }
+.weather-card { margin-top: 10px; padding: 12px; border-radius: 18px; background: var(--panel); border: 1px solid var(--line); animation: rowIn .35s var(--ease) both; }
+.wx-load { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; }
+.wx-head { display: flex; align-items: center; gap: 12px; }
+.wx-sky { font-size: 30px; line-height: 1; width: 34px; text-align: center; }
+.wx-wind { display: flex; height: 8px; border-radius: 4px; overflow: hidden; margin-top: 12px; background: rgba(255,255,255,.06); }
+.wx-wind i { display: block; height: 100%; transition: width .8s var(--ease); }
+.wx-wind .t { background: var(--grad); } .wx-wind .s { background: rgba(255,255,255,.18); } .wx-wind .h { background: linear-gradient(90deg, #ff8a5a, #ff4d5e); }
+.wx-legend { display: flex; justify-content: space-between; font-size: 12px; margin-top: 5px; font-weight: 700; }
+.wx-legend .t { color: var(--accent); } .wx-legend .h { color: #ff8a8f; }
+.wx-starts { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin: 10px -12px 0; padding: 0 12px 2px; }
+.wx-starts::-webkit-scrollbar { display: none; }
+.wx-starts button { flex: none; min-width: 74px; padding: 7px 8px; border-radius: 12px; background: rgba(255,255,255,.04); border: 1px solid var(--line); color: inherit; display: flex; flex-direction: column; align-items: center; position: relative; }
+.wx-starts button b { font-size: 13px; } .wx-starts button small { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.wx-starts button.on { background: rgba(139, 225, 58, .14); border-color: var(--accent); }
+.wx-starts button.best::after { content: '★'; position: absolute; top: -7px; right: -3px; font-size: 12px; color: #facc15; }
+.wish-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; padding: 10px 12px; border-radius: 14px;
+  background: linear-gradient(135deg, rgba(139,225,58,.12), rgba(47,125,251,.12)); border: 1px solid rgba(139,225,58,.35); font-size: 13.5px; font-weight: 700; }
+.wish-row[hidden] { display: none; }
+.wish-row span { flex: 1; }
+.result.wish { background: linear-gradient(135deg, rgba(139,225,58,.14), rgba(47,125,251,.12)); }
+.result.wish .ri { color: var(--accent); }
+.result.wish .pro-badge { margin-left: auto; align-self: center; }
+#sheet-safety h2 .pro-badge { margin-left: 6px; vertical-align: 3px; }
+.sf-fields { display: flex; flex-direction: column; gap: 8px; }
+.sf-fields input { width: 100%; padding: 13px 14px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); color: inherit; font: inherit; font-size: 15px; }
+.sf-fields input:focus { outline: none; border-color: var(--accent); }
+.sf-actions { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 12px; }
+.sf-actions .btn { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.sf-actions .btn svg { width: 18px; height: 18px; }
+.fall-alarm { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; padding: 24px;
+  background: radial-gradient(circle at 50% 40%, rgba(160, 20, 30, .92), rgba(40, 4, 8, .96)); animation: faPulse 1s ease-in-out infinite alternate; }
+.fall-alarm[hidden] { display: none; }
+@keyframes faPulse { from { background-color: rgba(120, 10, 20, .9); } to { background-color: rgba(70, 5, 10, .96); } }
+.fa-card { width: 100%; max-width: 360px; text-align: center; color: #fff; }
+.fa-card h2 { font-size: 28px; margin: 18px 0 8px; } .fa-card p { opacity: .85; font-size: 15px; line-height: 1.45; margin: 0 0 22px; }
+.fa-ring { position: relative; width: 150px; height: 150px; margin: 0 auto; }
+.fa-ring svg { width: 150px; height: 150px; transform: rotate(-90deg); }
+.fa-ring circle { fill: none; stroke-width: 9; stroke: rgba(255,255,255,.18); }
+.fa-ring #fa-arc { stroke: #fff; stroke-linecap: round; transition: stroke-dashoffset 1s linear; }
+.fa-ring b { position: absolute; inset: 0; display: grid; place-items: center; font-size: 54px; font-weight: 900; }
+.fa-card .btn.big { width: 100%; padding: 18px; font-size: 18px; border-radius: 18px; }
+.fa-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+.fa-row .btn { padding: 14px; border-radius: 16px; }
+.btn.danger { background: #fff; color: #b3121f; font-weight: 800; }
+.fall-alarm .btn.ghost { border: 1px solid rgba(255,255,255,.5); color: #fff; }
+.topbar .results { min-width: 0; max-width: 100%; overflow: hidden; }
+.results .result { min-width: 0; }
+.results .result > span:nth-child(2) { flex: 1; min-width: 0; }
+.results .result small, .results .result b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+.result.wish .pro-badge { flex: none; }

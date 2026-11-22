@@ -18,7 +18,8 @@ export async function loadSettings() {
       Object.assign(settings, saved, {
         layers: { ...DEFAULT_SETTINGS.layers, ...(saved.layers || {}) },
         bike: { ...DEFAULT_BIKE, ...(saved.bike || {}) },
-        details: { ...DEFAULT_SETTINGS.details, ...(saved.details || {}) }
+        details: { ...DEFAULT_SETTINGS.details, ...(saved.details || {}) },
+        safety: { ...DEFAULT_SETTINGS.safety, ...(saved.safety || {}) }
       });
     }
     // Einmalig auf das neue Premium-Erscheinungsbild umstellen (Satellit 3D)

@@ -38,7 +38,7 @@
   <header class="topbar">
     <div class="searchbar glass">
       <span class="s-ic" id="s-ic"></span>
-      <input id="q" type="search" placeholder="Wohin geht's?" autocomplete="off" enterkeyhint="search" />
+      <input id="q" type="search" placeholder="Wohin geht's? – oder „2 h Runde“" autocomplete="off" enterkeyhint="search" />
       <button id="q-clear" class="icon-btn small" aria-label="Leeren" hidden></button>
     </div>
     <button id="btn-locate" class="locate-btn round glass" aria-label="Mein Standort"></button>
@@ -74,6 +74,7 @@
         <button id="btn-legend"><span class="mm-ic"></span><span>Radwege &amp; Trails</span></button>
         <button id="btn-layers"><span class="mm-ic"></span><span>Kartenansicht</span></button>
         <button id="btn-mybike"><span class="mm-ic"></span><span>Mein Rad &amp; Wartung</span><i class="mm-dot" id="wear-dot" hidden></i></button>
+        <button id="btn-safety"><span class="mm-ic"></span><span>Sicherheit &amp; Notfall</span></button>
         <button id="btn-offline"><span class="mm-ic"></span><span>Offline-Karten</span></button>
         <button id="btn-trophy"><span class="mm-ic"></span><span>Meilensteine</span></button>
         <button id="btn-rec"><span class="mm-ic rec-core"></span><span id="rec-label">Fahrt aufzeichnen</span></button>
@@ -106,6 +107,9 @@
       <div class="plan-row" id="row-end"><span class="rp-flag" id="rp-flag"></span><button id="rp-end" class="rp-field">Ziel wählen</button><span class="chev"></span></div>
       <div class="plan-row add" id="row-via"><span class="rp-plus" id="rp-plus"></span><button id="rp-addvia" class="rp-field">Via-Punkt hinzufügen</button><button id="rp-swap" class="icon-btn small" aria-label="Start und Ziel tauschen"></button></div>
     </div>
+    <div class="wish-row" id="wish-row" hidden>
+      <span>✨ Rundtour nach deinem Wunsch</span><button class="btn tiny" id="wish-again">Andere Variante</button>
+    </div>
     <div class="profile-row" id="profile-row">
       <span class="pr-ic" id="pr-ic"></span><span class="pr-lbl">Fahrradprofil</span>
       <button class="pr-chip" id="pr-chip"></button>
@@ -124,6 +128,7 @@
       </div>
     </div>
     <div id="ebike-card" class="ebike-card" hidden></div>
+    <div id="weather-card" class="weather-card" hidden></div>
     <div id="offline-card" class="offline-card" hidden>
       <span class="oc-ic" id="oc-ic"></span>
       <div class="oc-txt">
@@ -180,6 +185,27 @@
   </section>
 
   <!-- Offline-Karten -->
+  <!-- Sicherheit -->
+  <section id="sheet-safety" class="sheet glass">
+    <div class="sheet-handle"><i></i></div>
+    <div class="sheet-head">
+      <button id="safety-close" class="icon-btn" aria-label="Zurück"></button>
+      <h2>Sicherheit <span class="pro-badge">PRO</span></h2>
+      <span></span>
+    </div>
+    <div id="safety-body" class="scroll"></div>
+  </section>
+
+  <div id="fall-alarm" class="fall-alarm" hidden>
+    <div class="fa-card">
+      <div class="fa-ring"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="54"/><circle id="fa-arc" cx="60" cy="60" r="54"/></svg><b id="fa-count">30</b></div>
+      <h2>Sturz erkannt</h2>
+      <p id="fa-text">Ist alles in Ordnung? Ohne Antwort wird dein Notfallkontakt mit deinem Standort benachrichtigt.</p>
+      <button id="fa-ok" class="btn primary big">Mir geht's gut</button>
+      <div class="fa-row"><button id="fa-help" class="btn danger">Hilfe holen</button><button id="fa-112" class="btn ghost">112 anrufen</button></div>
+    </div>
+  </div>
+
   <section id="sheet-offline" class="sheet glass tall">
     <div class="sheet-handle"><i></i></div>
     <div class="sheet-head">
