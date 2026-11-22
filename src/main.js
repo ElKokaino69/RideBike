@@ -12,7 +12,7 @@ import { SplashScreen } from '@capacitor/splash-screen';
 
 import { APP, MAP_STYLES, C } from './config.js';
 import { BIKE_TYPES, TYRES, AERO, bikeType, applyBikeType, bikeSummary, brouterRequest } from './bike.js';
-import { settings, loadSettings, setSetting, onSettingChange } from './settings.js';
+import { settings, loadSettings, setSetting, onSettingChange, saveSettings } from './settings.js';
 import {
   createMap, map, switchStyle, swapDem, currentExaggeration, applyTerrain, applySky, applyBuildings, applyHillshade,
   applyLayerVisibility, startAmbientAnimation, BIKE_LAYER_IDS, activeStyleId, effectiveStyleId
@@ -25,6 +25,10 @@ import {
 } from './offline.js';
 import { ingestTrails } from './trails.js';
 import { initSky, applySkyFx } from './sky.js';
+import { simulate, compareLevels, chargersNear, ASSIST, BATTERIES } from './ebike.js';
+import { isEbike } from './bike.js';
+import { recordFlyover, shareVideo, videoSupported } from './video.js';
+import { loadWear, addRide as wearAddRide, status as wearStatus, resetPart, dueCount, shopUrl, addManualKm } from './wear.js';
 import { MILESTONES, CATS as MS_CATS, TIERS, evaluate, medalCounts, fmtValue, progress, tierOf } from './milestones.js';
 import { stats, rides, loadStats, initRecorder, rec, onRecord, startRide, finishRide, markArrived, liveUnlocks, countFlyover, rideElevationRoute } from './rides.js';
 import { initTrails, refreshTrails, onTrailStatus, getTrail, selectTrail, networkLabel } from './trails.js';
@@ -50,6 +54,7 @@ async function boot() {
   pin(document.body); pin(document.documentElement); window.addEventListener('scroll', () => window.scrollTo(0, 0));
   await loadSettings();
   await loadStats();
+  await loadWear();
   await initNetwork();
   await createMap('map', settings.lastView);
   initTrails();
@@ -109,7 +114,7 @@ async function boot() {
     setSetting('lastView', { center: [c.lng, c.lat], zoom: map.getZoom(), pitch: map.getPitch(), bearing: map.getBearing() });
   }, 1200));
 
-  if (/[?&]debug\b/.test(location.search)) window.__rb = { map, settings, setSetting, growTerrain, nav, route, loc, stats, rides, celebrate, showRideSummary };
+  if (/[?&]debug\b/.test(location.search)) window.__rb = { recordFlyover, simulate, wearStatus, map, settings, setSetting, growTerrain, nav, route, loc, stats, rides, celebrate, showRideSummary };
   // Quellenangabe kompakt starten (MapLibre klappt sie sonst anfangs auf)
   // Quellenangabe: kompakt, nur auf Antippen aufklappen (MapLibre klappt sie sonst selbst auf)
   document.addEventListener('click', (e) => {
@@ -148,6 +153,7 @@ function injectIcons() {
   const set = (id, html) => { const el = $(id); if (el) el.innerHTML = html; };
   set('#s-ic', ICON.search);
   set('#btn-offline .mm-ic', ICON.cloud);
+  set('#btn-mybike .mm-ic', ICON.bike);
   set('#btn-plan', ICON.navArrow);
   set('#btn-more', ICON.dots + ($('#btn-more').innerHTML || ''));
   set('#offline-close', ICON.close);
@@ -170,6 +176,7 @@ function injectIcons() {
   set('#style-close', ICON.close);
   set('#bike-close', ICON.chevL);
   set('#btn-fly', ICON.fly);
+  set('#btn-video', ICON.film || ICON.fly);
   set('#btn-go', `${ICON.nav}<span>Navigation starten</span>`);
   set('#nav-stop', ICON.close);
   set('#nav-recenter', ICON.navArrow);
@@ -456,6 +463,17 @@ function wireFabs() {
   const setMore = (open) => { menu.hidden = !open; $('#btn-more').classList.toggle('active', open); };
   $('#btn-more').onclick = (e) => { e.stopPropagation(); setMore(menu.hidden); };
   menu.addEventListener('click', () => setTimeout(() => setMore(false), 120));
+  $('#btn-mybike').onclick = () => openSheet('sheet-bike');
+  // PRO-Abzeichen erklären (Beta: alles frei – Abo folgt über Google Play)
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.pro-badge')) return;
+    e.stopPropagation();
+    dialog({
+      icon: ICON.medal, title: 'RideBike Pro',
+      text: 'E-Bike-Reichweite mit Akku-Planer, Wartungs-Tracker und 3D-Videos sind Pro-Funktionen. In der Beta sind sie für dich kostenlos freigeschaltet.',
+      buttons: [{ label: 'Alles klar', primary: true }]
+    });
+  }, true);
   map.on('click', () => setMore(false));
   map.on('dragstart', () => setMore(false));
   // Pfeil: Route planen – mit Ziel öffnet der Planer, sonst geht es in die Suche
@@ -825,6 +843,93 @@ function renderStats() {
   countUp($('#st-time'), r.time, (v) => fmtDur(v));
   if (r.hasEle) countUp($('#st-asc'), r.ascent, (v) => `+${Math.round(v)} m`);
   else $('#st-asc').textContent = '–';
+  renderEbikeCard();
+}
+
+// ---------------------------------------------------------------------
+// E-Bike-Reichweite (Pro)
+// ---------------------------------------------------------------------
+const haptic = () => { if (navigator.vibrate) navigator.vibrate(12); };
+let chargerMarkers = [];
+let emptyMarker = null;
+function clearEbikeMarkers() {
+  chargerMarkers.forEach((m) => m.remove()); chargerMarkers = [];
+  emptyMarker?.remove(); emptyMarker = null;
+}
+
+function renderEbikeCard() {
+  const card = $('#ebike-card');
+  const r = route.data;
+  clearEbikeMarkers();
+  if (!r || !isEbike()) { card.hidden = true; return; }
+  const b = settings.bike;
+  const res = simulate(r);
+  if (!res) { card.hidden = true; return; }
+  const levels = compareLevels(r);
+  const lvl = ASSIST.find((a) => a.id === b.assist) || ASSIST[1];
+  const used = Math.min(100, res.pct);
+  const left = Math.round(res.remainPct);
+  const state = !res.ok ? 'bad' : left < 20 ? 'warn' : 'good';
+  const best = levels.filter((l) => l.res?.ok).pop();
+  card.className = `ebike-card ${state}`;
+  card.hidden = false;
+  card.innerHTML = `
+    <div class="eb-head">
+      <span class="eb-batt"><i style="--fill:${Math.max(0, Math.min(100, b.charge - used))}%"></i></span>
+      <div class="eb-txt">
+        <b>${res.ok ? `Akku reicht – ${left} % bleiben` : `Akku leer nach ${fmtDist(res.emptyAtM)}`}</b>
+        <small>${Math.round(res.wh)} Wh von ${Math.round(b.batteryWh * b.charge / 100)} Wh · Stufe ${lvl.name} · Start ${b.charge} %</small>
+      </div>
+      <span class="pro-badge">PRO</span>
+    </div>
+    <div class="eb-levels">${levels.map((l) => `
+      <button data-assist="${l.id}" class="${l.id === b.assist ? 'on' : ''} ${l.res?.ok ? '' : 'no'}">
+        <b>${l.name}</b><small>${l.res ? Math.round(l.res.pct) + ' %' : '–'}</small></button>`).join('')}
+    </div>
+    ${!res.ok ? `<div class="eb-tip">${best ? `Mit <b>${best.name}</b> kommst du ans Ziel (${Math.round(best.res.pct)} % Verbrauch).` : 'Auch in Eco reicht der Akku nicht – unterwegs nachladen.'}
+      <button class="btn tiny" id="eb-chargers">${ICON.bolt}Ladestationen</button></div>`
+      : left < 20 ? `<div class="eb-tip">Knapp: weniger als 20 % Reserve. <button class="btn tiny" id="eb-chargers">${ICON.bolt}Ladestationen</button></div>` : ''}
+    <div class="eb-charge"><span>Ladestand beim Start</span><input type="range" id="eb-charge" min="10" max="100" step="5" value="${b.charge}"><b id="eb-charge-v">${b.charge} %</b></div>`;
+  $$('#ebike-card [data-assist]').forEach((x) => x.onclick = () => {
+    settings.bike.assist = x.dataset.assist; saveSettings(); haptic(); renderEbikeCard();
+  });
+  const sl = $('#eb-charge');
+  sl.oninput = () => { $('#eb-charge-v').textContent = `${sl.value} %`; };
+  sl.onchange = () => { settings.bike.charge = +sl.value; saveSettings(); renderEbikeCard(); };
+  $('#eb-chargers')?.addEventListener('click', showChargers);
+  if (!res.ok) {
+    const el = document.createElement('div');
+    el.className = 'batt-empty-marker';
+    el.innerHTML = ICON.bolt;
+    emptyMarker = new maplibregl.Marker({ element: el }).setLngLat(pointAt(r, res.emptyAtM)).addTo(map);
+  }
+}
+
+function pointAt(r, m) {
+  let i = r.cum.findIndex((c) => c >= m);
+  if (i < 0) i = r.cum.length - 1;
+  return r.coords[i].slice(0, 2);
+}
+
+async function showChargers() {
+  const r = route.data; if (!r) return;
+  const res = simulate(r);
+  const at = pointAt(r, res?.emptyAtM ? res.emptyAtM * 0.8 : r.total * 0.5);
+  toast('Suche Ladestationen…');
+  try {
+    const list = await chargersNear(at, 5000);
+    chargerMarkers.forEach((m) => m.remove()); chargerMarkers = [];
+    if (!list.length) { toast('Keine Ladestationen in der Nähe gefunden – Cafés und Hütten fragen'); return; }
+    for (const c of list) {
+      const el = document.createElement('div');
+      el.className = 'charger-marker';
+      el.innerHTML = ICON.bolt;
+      el.title = c.name;
+      el.onclick = (e) => { e.stopPropagation(); toast(`${c.name}${c.fee === 'no' ? ' · kostenlos' : ''} – als Zwischenziel antippen & halten`); };
+      chargerMarkers.push(new maplibregl.Marker({ element: el }).setLngLat(c.lngLat).addTo(map));
+    }
+    toast(`${list.length} Ladestationen gefunden`);
+  } catch { toast('Ladestationen gerade nicht abrufbar'); }
 }
 
 function setDestination(lngLat, label) {
@@ -875,7 +980,7 @@ async function recompute() {
   $('#route-error').hidden = true;
   $('#offline-card').hidden = true;
   $('#btn-go').disabled = true;
-  $('#btn-fly').disabled = true;
+  $('#btn-fly').disabled = true; $('#btn-video').disabled = true;
   try {
     const r = await calcRoute([start, ...plan.vias.map((v) => v.lngLat), plan.end.lngLat]);
     if (my !== routeSeq) return;
@@ -883,7 +988,7 @@ async function recompute() {
     renderStats();
     requestAnimationFrame(() => drawElevation($('#elev'), r, onElevHover));
     $('#btn-go').disabled = false;
-    $('#btn-fly').disabled = false;
+    $('#btn-fly').disabled = false; $('#btn-video').disabled = false;
     updateOfflineCard();
   } catch (e) {
     if (my !== routeSeq) return;
@@ -970,8 +1075,44 @@ function wireRoutePlanner() {
     celebrate(countFlyover());
   };
   $('#fly-stop').onclick = () => { stopFlyover(); endFly(); };
+  $('#vid-cancel').onclick = () => vidAbort?.abort();
+  $('#btn-video').onclick = () => makeVideo({ title: plan.end?.label ? `Tour nach ${plan.end.label}` : 'Meine Tour in 3D' });
   $('#btn-go').onclick = beginNavigation;
   window.addEventListener('resize', debounce(() => { if (route.data) drawElevation($('#elev'), route.data, onElevHover); }, 200));
+}
+
+// ---------------------------------------------------------------------
+// 3D-Flyover als Video (Reels/Stories/WhatsApp)
+// ---------------------------------------------------------------------
+let vidAbort = null;
+async function makeVideo({ title, sub, restore } = {}) {
+  if (!route.data) return;
+  if (!videoSupported()) { toast('Video-Aufnahme wird auf diesem Gerät nicht unterstützt'); return; }
+  const ov = $('#vid-overlay');
+  ['sheet-route', 'sheet-ride', 'sheet-info'].forEach((id) => $(`#${id}`).classList.add('collapsed'));
+  document.body.classList.add('flying', 'recording-video');
+  ov.hidden = false;
+  vidAbort = new AbortController();
+  const arc = $('#vid-arc'), C = 2 * Math.PI * 19;
+  arc.style.strokeDasharray = C;
+  try {
+    const res = await recordFlyover({
+      title, sub: sub || `${fmtDist(route.data.total)} · ${route.data.hasEle ? '+' + Math.round(route.data.ascent || 0) + ' m' : ''}`,
+      signal: vidAbort.signal,
+      onProgress: (k) => { arc.style.strokeDashoffset = C * (1 - k); $('#vid-pct').textContent = `${Math.round(k * 100)} %`; }
+    });
+    ov.hidden = true;
+    if (vidAbort.signal.aborted) { toast('Aufnahme abgebrochen'); return; }
+    const how = await shareVideo(res);
+    toast(how === 'downloaded' ? 'Video gespeichert' : 'Video bereit zum Teilen');
+  } catch (e) {
+    toast(e?.message || 'Video konnte nicht erstellt werden');
+  } finally {
+    ov.hidden = true;
+    document.body.classList.remove('flying', 'recording-video');
+    ['sheet-route', 'sheet-ride', 'sheet-info'].forEach((id) => $(`#${id}`).classList.remove('collapsed'));
+    restore?.();
+  }
 }
 
 function endFly() {
@@ -1028,6 +1169,19 @@ function buildBikeSheet() {
       <span class="switch"><input type="checkbox" id="bike-aero" ${['aero', 'sport'].includes(b.aero) ? 'checked' : ''}><span></span></span></label>
     <div class="bike-info" id="bike-info"></div>
 
+    <div class="bike-sec" id="bike-ebike">
+      <div class="bike-label">Akku <span class="pro-badge">PRO</span></div>
+      <div class="type-chips" id="batt-chips">${BATTERIES.map((w) => `<button data-batt="${w}" class="${w === b.batteryWh ? 'on' : ''}">${w} Wh</button>`).join('')}</div>
+      <div class="bike-label sm">Standard-Unterstützung</div>
+      <div class="seg" data-seg="assist">${ASSIST.map((a) => `<button class="${a.id === b.assist ? 'on' : ''}" data-v="${a.id}">${a.name}</button>`).join('')}</div>
+    </div>
+
+    <div class="bike-sec">
+      <div class="bike-label">Wartung &amp; Verschleiß <span class="pro-badge">PRO</span></div>
+      <div id="wear-list" class="wear-list"></div>
+      <button class="adv-toggle" id="wear-add">${ICON.plus || '+'} Kilometer nachtragen</button>
+    </div>
+
     <button class="adv-toggle" id="adv-toggle">Erweitert: Fahrer, Leistung & Wegewahl ${ICON.chevD}</button>
     <div class="adv" id="adv"><div>
       ${BIKE_RANGES.filter(([k]) => k !== 'bikeKg').map(([k, title, min, max, step, f]) => `
@@ -1067,6 +1221,13 @@ function buildBikeSheet() {
   body.addEventListener('click', (e) => {
     const t = e.target.closest('#type-chips button');
     if (t) { selectBikeType(t.dataset.type); return; }
+    const bt = e.target.closest('[data-batt]');
+    if (bt) { setSetting('bike.batteryWh', +bt.dataset.batt); $$('#batt-chips button').forEach((x) => x.classList.toggle('on', x === bt)); return; }
+    const wr = e.target.closest('[data-wear-reset]');
+    if (wr) { resetPart(wr.dataset.wearReset); renderWear(); toast('Zähler zurückgesetzt – gute Fahrt!'); return; }
+    const ws = e.target.closest('[data-wear-shop]');
+    if (ws) { window.open(ws.dataset.wearShop, '_blank'); return; }
+    if (e.target.closest('#wear-add')) { askManualKm(); return; }
     const st = e.target.closest('[data-step]');
     if (st) {
       const v = Math.max(5, Math.min(70, Math.round((settings.bike.bikeKg + Number(st.dataset.step)) * 2) / 2));
@@ -1121,6 +1282,56 @@ function buildBikeSheetValues() {
   if ($('#bike-tyre')) $('#bike-tyre').value = b.tyre;
   if ($('#bike-kg')) $('#bike-kg').textContent = String(b.bikeKg).replace('.', ',');
   if ($('#bike-aero')) $('#bike-aero').checked = ['aero', 'sport'].includes(b.aero);
+  if ($('#bike-ebike')) {
+    $('#bike-ebike').hidden = !isEbike();
+    $$('#batt-chips button').forEach((x) => x.classList.toggle('on', +x.dataset.batt === b.batteryWh));
+  }
+  renderWear();
+}
+
+// ---------------------------------------------------------------------
+// Wartung & Verschleiß (Pro)
+// ---------------------------------------------------------------------
+function renderWear() {
+  const el = $('#wear-list');
+  updateWearDot();
+  if (!el) return;
+  el.innerHTML = wearStatus().map((p) => {
+    const pct = Math.round(p.pct);
+    const st = pct >= 100 ? 'due' : pct >= 90 ? 'soon' : 'ok';
+    const info = p.months && p.pct >= 90 && p.km < p.interval * 0.9 ? 'jährlich fällig' : `${Math.round(p.km).toLocaleString('de-DE')} / ${p.interval.toLocaleString('de-DE')} km`;
+    return `<div class="wear-row ${st}">
+      <div class="wr-top"><b>${p.name}</b><small>${info}</small></div>
+      <div class="wr-bar"><i style="width:${Math.min(100, pct)}%"></i></div>
+      ${st !== 'ok' ? `<div class="wr-act"><span>${st === 'due' ? 'Wechsel fällig' : 'Bald fällig'}</span>
+        ${p.q ? `<button class="btn tiny ghost" data-wear-shop="${esc(shopUrl(p))}">Teil finden</button>` : ''}
+        <button class="btn tiny" data-wear-reset="${p.id}">Erneuert</button></div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function updateWearDot() {
+  const n = dueCount();
+  const dot = $('#wear-dot');
+  if (dot) dot.hidden = n === 0;
+  const td = $('#trophy-dot');
+  if (n > 0 && td) td.hidden = false;
+}
+
+function onRideWear(result) {
+  if (!result?.ride) return;
+  const due = wearAddRide(result.ride, isEbike());
+  updateWearDot();
+  if (due.length) setTimeout(() => toast(`Wartung: ${due.map((d) => d.name).join(', ')} bald fällig`), 2500);
+}
+
+async function askManualKm() {
+  const v = prompt('Wie viele Kilometer bist du ohne App gefahren?', '100');
+  const km = Number(String(v || '').replace(',', '.'));
+  if (!(km > 0)) return;
+  addManualKm(Math.min(20000, km));
+  renderWear();
+  toast(`${Math.round(km)} km nachgetragen`);
 }
 
 function updateBikeSummary() {
@@ -1491,7 +1702,7 @@ async function loadSavedTour(region) {
   renderStats();
   requestAnimationFrame(() => drawElevation($('#elev'), r, onElevHover));
   $('#btn-go').disabled = false;
-  $('#btn-fly').disabled = false;
+  $('#btn-fly').disabled = false; $('#btn-video').disabled = false;
   updateOfflineCard();
 }
 
@@ -1609,6 +1820,7 @@ function stopFreeRide(showSummary = true) {
   $('#ride-hud').hidden = true;
   import('@capacitor-community/keep-awake').then((m) => m.KeepAwake.allowSleep()).catch(() => {});
   const result = finishRide();
+  onRideWear(result);
   if (!showSummary) return;
   if (!result) { toast('Fahrt zu kurz – nicht gespeichert'); return; }
   showRideSummary(result.ride, result.unlocked);
@@ -1714,12 +1926,20 @@ function showRideSummary(r, unlocked = []) {
     <div class="surf-bar">${SURF.map(([k, , c]) => `<i style="width:${((r.surf?.[k] || 0) / total) * 100}%;background:${c}"></i>`).join('')}</div>
     <div class="surf-legend">${SURF.filter(([k]) => (r.surf?.[k] || 0) > 0.01).map(([k, n, c]) => `<span style="--c:${c}">${n} ${fmtDist((r.surf[k] || 0) * 1000)}</span>`).join('')}</div>
     ${unlocked?.length ? `<div class="sec">Neue Meilensteine (${uniqBest(unlocked).length})</div><div class="rs-medals">${uniqBest(unlocked).map((u, i) => `<div style="--i:${i}">${medalSvg(u.tier, u.m.icon, catOf(u.m.cat).color, 56)}<b>${esc(u.m.name)}</b><small>${TIER_NAME[u.tier]}</small></div>`).join('')}</div>` : ''}
+    <button class="btn video-cta" id="rs-video">${ICON.film || ICON.fly}<span>Als 3D-Video teilen</span><span class="pro-badge">PRO</span></button>
     <div class="actions"><button class="btn ghost" id="rs-ms">${ICON.trophy}<span>Meilensteine</span></button><button class="btn primary" id="rs-done">Fertig</button></div>`;
   ['sheet-route', 'sheet-info', 'sheet-ms'].forEach(closeSheet);
   openSheet('sheet-ride');
   const er = rideElevationRoute(r);
   requestAnimationFrame(() => drawElevation($('#ride-elev'), er, null));
   $('#rs-done').onclick = () => closeSheet('sheet-ride');
+  $('#rs-video').hidden = !er;
+  $('#rs-video').onclick = () => {
+    const prev = route.data;
+    let up = 0; for (let i = 1; i < er.coords.length; i++) up += Math.max(0, er.coords[i][2] - er.coords[i - 1][2]);
+    showRoute({ ...er, ascent: r.ascent || up, time: r.movingS || 0, maneuvers: [] }, { animate: false, fit: false });
+    makeVideo({ title: d.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long' }), restore: () => showRoute(prev, { animate: false, fit: false }) });
+  };
   $('#rs-ms').onclick = () => { closeSheet('sheet-ride'); msTab = 'ms'; renderMilestones(); openSheet('sheet-ms'); };
   if (unlocked?.length) setTimeout(() => celebrate(unlocked), 700);
   updateTrophyDot();
@@ -1963,6 +2183,7 @@ function endNavigation() {
   arrivedOnce = false;
   stopNavigation();
   const result = finishRide();
+  onRideWear(result);
   if (result) setTimeout(() => showRideSummary(result.ride, result.unlocked), 400);
   document.body.classList.remove('navigating');
   $('#nav-hud').hidden = true;

@@ -637,3 +637,72 @@ body.navigating .user-loc { width: 60px; height: 60px; }
 body.navigating .user-loc .ul-dot::before { filter: drop-shadow(0 0 2px #fff) drop-shadow(0 0 14px rgba(80, 160, 255, 1)) drop-shadow(0 6px 6px rgba(0,0,0,.35)); }
 #nav-hud .nav-bottom { align-items: stretch; }
 #nav-hud .nav-tile { justify-content: center; }
+
+/* =====================================================================
+   v1.7 – Pro-Funktionen: E-Bike-Reichweite, Wartung, Flyover-Video
+   ===================================================================== */
+.pro-badge { font-size: 10px; font-weight: 900; letter-spacing: .8px; padding: 3px 7px; border-radius: 7px;
+  background: linear-gradient(135deg, #ffe27a, #f5b52e); color: #2a1c00; box-shadow: 0 0 12px rgba(245, 181, 46, .35); }
+.ebike-card { margin-top: 10px; padding: 12px; border-radius: 18px; background: var(--panel); border: 1px solid var(--line); animation: rowIn .35s var(--ease) both; }
+.ebike-card.good { border-color: rgba(139, 225, 58, .35); }
+.ebike-card.warn { border-color: rgba(250, 204, 21, .5); }
+.ebike-card.bad { border-color: rgba(255, 90, 100, .55); background: rgba(255, 70, 80, .07); }
+.eb-head { display: flex; align-items: center; gap: 12px; }
+.eb-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.eb-txt b { font-size: 15px; } .eb-txt small { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.eb-batt { position: relative; width: 22px; height: 38px; border-radius: 5px; border: 2px solid currentColor; color: var(--accent); flex: none; }
+.ebike-card.warn .eb-batt { color: #facc15; } .ebike-card.bad .eb-batt { color: #ff5a64; }
+.eb-batt::before { content: ''; position: absolute; top: -6px; left: 5px; width: 8px; height: 4px; border-radius: 2px 2px 0 0; background: currentColor; }
+.eb-batt i { position: absolute; left: 2px; right: 2px; bottom: 2px; height: calc(var(--fill) * .9); max-height: calc(100% - 4px); border-radius: 2px; background: currentColor;
+  transition: height .8s var(--ease); }
+.eb-levels { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }
+.eb-levels button { padding: 7px 4px; border-radius: 12px; background: rgba(255,255,255,.04); border: 1px solid var(--line); color: inherit; display: flex; flex-direction: column; align-items: center; }
+.eb-levels button b { font-size: 13px; } .eb-levels button small { font-size: 11.5px; color: var(--muted); }
+.eb-levels button.on { background: rgba(139, 225, 58, .14); border-color: var(--accent); }
+.eb-levels button.no small { color: #ff6b75; }
+.eb-tip { margin-top: 10px; display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.eb-tip .btn { margin-left: auto; flex: none; display: inline-flex; gap: 5px; align-items: center; }
+.eb-tip .btn svg { width: 14px; height: 14px; }
+.eb-charge { display: flex; align-items: center; gap: 10px; margin-top: 10px; font-size: 12.5px; color: var(--muted); }
+.eb-charge input { flex: 1; accent-color: var(--accent); } .eb-charge b { color: var(--text, #fff); min-width: 40px; text-align: right; }
+.batt-empty-marker, .charger-marker { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; cursor: pointer;
+  background: #ff5a64; color: #fff; border: 2px solid #fff; box-shadow: 0 4px 12px rgba(0,0,0,.4); animation: pinDrop .5s var(--spring) both; }
+.charger-marker { background: #2f7dfb; }
+.batt-empty-marker svg, .charger-marker svg { width: 16px; height: 16px; }
+.mm-dot { width: 9px; height: 9px; border-radius: 50%; background: #ff5a64; margin-left: 4px; box-shadow: 0 0 8px #ff5a64; }
+@keyframes pinDrop { from { opacity: 0; transform: translateY(-14px) scale(.6); } to { opacity: 1; transform: none; } }
+.bike-sec { margin-top: 16px; }
+.bike-sec[hidden] { display: none; }
+.bike-label .pro-badge { margin-left: 6px; vertical-align: 1px; }
+.bike-label.sm { margin-top: 10px; font-size: 12px; }
+.wear-list { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.wear-row { padding: 10px 12px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); }
+.wr-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.wr-top b { font-size: 14px; } .wr-top small { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.wr-bar { height: 6px; border-radius: 3px; background: rgba(255,255,255,.08); margin-top: 7px; overflow: hidden; }
+.wr-bar i { display: block; height: 100%; border-radius: 3px; background: var(--grad); transition: width .8s var(--ease); }
+.wear-row.soon { border-color: rgba(250, 204, 21, .45); } .wear-row.soon .wr-bar i { background: linear-gradient(90deg, #facc15, #f59e0b); }
+.wear-row.due { border-color: rgba(255, 90, 100, .55); } .wear-row.due .wr-bar i { background: linear-gradient(90deg, #ff8a5a, #ff4d5e); }
+.wr-act { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 12.5px; }
+.wr-act span { flex: 1; color: #ffb4ba; font-weight: 700; } .wear-row.soon .wr-act span { color: #fde68a; }
+.btn.tiny.ghost { background: transparent; border: 1px solid var(--line); color: inherit; }
+.vid-overlay { position: absolute; left: 12px; right: 12px; top: calc(14px + var(--sat)); z-index: 60; pointer-events: none; }
+.vid-overlay[hidden] { display: none; }
+.vid-card { pointer-events: auto; display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 20px; animation: rowIn .35s var(--ease) both; }
+.vid-card > div:nth-child(2) { flex: 1; display: flex; flex-direction: column; } .vid-card small { color: var(--muted); font-size: 12px; }
+.vid-ring { position: relative; width: 48px; height: 48px; flex: none; }
+.vid-ring svg { width: 48px; height: 48px; transform: rotate(-90deg); }
+.vid-ring circle { fill: none; stroke-width: 4; stroke: rgba(255,255,255,.12); }
+.vid-ring #vid-arc { stroke: #ff4d5e; stroke-linecap: round; transition: stroke-dashoffset .3s linear; }
+.vid-ring span { position: absolute; inset: 0; display: grid; place-items: center; font-size: 11px; font-weight: 800; }
+body.recording-video .topbar, body.recording-video .fab-col, body.recording-video .zoom-col, body.recording-video .compass-btn,
+body.recording-video .map-hud, body.recording-video #fly-bar { opacity: 0; pointer-events: none; }
+.video-cta { width: 100%; margin-top: 14px; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 13px; border-radius: 16px;
+  background: linear-gradient(135deg, rgba(139,225,58,.18), rgba(47,125,251,.18)); border: 1px solid rgba(139,225,58,.45); color: #fff; font-weight: 800; }
+.video-cta svg { width: 20px; height: 20px; color: var(--accent); }
+/* Routenplaner: Inhalte nicht mehr zusammenquetschen – Blatt scrollt, Knöpfe bleiben unten */
+#sheet-route { overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
+#sheet-route::-webkit-scrollbar { display: none; }
+#sheet-route > * { flex-shrink: 0; }
+#sheet-route > .actions { position: sticky; bottom: 0; z-index: 3; padding-top: 10px; padding-bottom: 4px;
+  background: linear-gradient(to bottom, transparent, var(--sheet-bg, rgba(12,17,24,.96)) 30%); }

@@ -3,7 +3,7 @@
 
 export const APP = {
   name: 'RideBike',
-  version: '1.6.0',
+  version: '1.7.0',
   author: 'Florian Enders',
   year: 2026
 };
@@ -51,6 +51,9 @@ export const DEM_HD = {
   url: 'https://tiles.mapterhorn.com/tilejson.json',
   attribution: 'Höhen: <a href="https://mapterhorn.com" target="_blank">Mapterhorn</a>'
 };
+
+/** Ersatzteil-Suche für den Wartungs-Tracker – hier später die Partner-ID (Affiliate) eintragen */
+export const PARTS_SHOP = 'https://www.bike-components.de/de/s/?keywords={q}';
 
 export const WAYMARKED = {
   cycling: 'https://tile.waymarkedtrails.org/cycling/{z}/{x}/{y}.png',

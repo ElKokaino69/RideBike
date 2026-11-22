@@ -10,10 +10,10 @@ export const BIKE_TYPES = [
   { id: 'road',     name: 'Rennrad',    icon: 'fast',   brouter: 'fastbike', bikeKg: 8,  tyre: 'road',     aero: 'aero',    support: 0,   maxSpeed: 60 },
   { id: 'gravel',   name: 'Gravel',     icon: 'trail',  brouter: 'gravel',   bikeKg: 10, tyre: 'gravel',   aero: 'sport',   support: 0,   maxSpeed: 50 },
   { id: 'mtb',      name: 'MTB',        icon: 'mountain', brouter: 'mtb',    bikeKg: 14, tyre: 'knobby',   aero: 'upright', support: 0,   maxSpeed: 45 },
-  { id: 'ebike',    name: 'E-Bike',     icon: 'fast',   brouter: 'trekking', bikeKg: 25, tyre: 'allround', aero: 'upright', support: 150, maxSpeed: 25 },
-  { id: 'emtb',     name: 'E-MTB',      icon: 'mountain', brouter: 'mtb',    bikeKg: 24, tyre: 'knobby',   aero: 'upright', support: 200, maxSpeed: 25 },
-  { id: 'speed',    name: 'S-Pedelec',  icon: 'fast',   brouter: 'fastbike', bikeKg: 28, tyre: 'allround', aero: 'sport',   support: 250, maxSpeed: 45 },
-  { id: 'cargo',    name: 'Lastenrad',  icon: 'shield', brouter: 'trekking', bikeKg: 40, tyre: 'balloon',  aero: 'cargo',   support: 200, maxSpeed: 25, avoidSteps: true, avoidSteep: true }
+  { id: 'ebike',    name: 'E-Bike',     icon: 'fast',   brouter: 'trekking', batteryWh: 625, bikeKg: 25, tyre: 'allround', aero: 'upright', support: 150, maxSpeed: 25 },
+  { id: 'emtb',     name: 'E-MTB',      icon: 'mountain', brouter: 'mtb',    batteryWh: 750, bikeKg: 24, tyre: 'knobby',   aero: 'upright', support: 200, maxSpeed: 25 },
+  { id: 'speed',    name: 'S-Pedelec',  icon: 'fast',   brouter: 'fastbike', batteryWh: 750, bikeKg: 28, tyre: 'allround', aero: 'sport',   support: 250, maxSpeed: 45 },
+  { id: 'cargo',    name: 'Lastenrad',  icon: 'shield', brouter: 'trekking', batteryWh: 545, bikeKg: 40, tyre: 'balloon',  aero: 'cargo',   support: 200, maxSpeed: 25, avoidSteps: true, avoidSteep: true }
 ];
 
 // Rollwiderstand (C_r) je Reifen
@@ -49,6 +49,7 @@ export function applyBikeType(id) {
     aero: t.aero,
     support: t.support,
     maxSpeed: t.maxSpeed,
+    ...(t.batteryWh ? { batteryWh: t.batteryWh } : {}),
     avoidTraffic: !!t.avoidTraffic,
     avoidSteps: !!t.avoidSteps,
     avoidSteep: !!t.avoidSteep,
@@ -118,3 +119,6 @@ export function bikeSummary() {
   const { mass, power } = physics();
   return { kmh: v, mass, power };
 }
+
+/** Hat das aktuelle Rad einen Motor? */
+export const isEbike = (b = settings.bike) => (b.support || 0) > 0;

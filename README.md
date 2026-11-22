@@ -15,6 +15,11 @@ App-ID: `de.enders.ridebike` · Capacitor 8 · MapLibre GL 5 · Vite
 - Animierter Kartenstart (Anflug zum Standort), leuchtende Radwege, fließende Routenlinie
 - Kompass, 2D/3D-Umschalter, Drehen und Neigen mit zwei Fingern
 
+**Pro-Funktionen (v1.7, in der Beta frei)**
+- E-Bike-Reichweite: Akku-Simulation entlang der Route (Steigung, Gewicht, Roll-/Luftwiderstand, Abregelgrenze), Vergleich Eco/Tour/Sport/Turbo, Warnung mit Punkt „Akku leer“, Ladestationen in der Nähe (Overpass)
+- Wartungs-Tracker: Kette, Kassette, Bremsbeläge, Reifen, Inspektion – Fahrten zählen automatisch (Gelände & E-Bike beschleunigen Verschleiß), Hinweise bei 90 %, „Teil finden“-Link (Partner-ID in `config.js` → `PARTS_SHOP`)
+- 3D-Flyover als Hochformat-Video (720×1280) mit Tourdaten, Höhenprofil und Abspann – teilen über das Android-Teilen-Menü; auch für aufgezeichnete Fahrten
+
 **Design wie Vorlage „RideBike 3D Premium“ (v1.6)**
 - Karte: Suche mit eigenem Standort-Knopf, Kompass darunter; rechts nur 3D, Ebenen (Kartenstil), Route planen und „Mehr“ (Radwege & Trails, Kartenansicht, Offline, Meilensteine, Fahrt aufzeichnen)
 - Route bleibt nach „Zurück“ auf der Karte, unten drei Kacheln (Höhe mit Anstieg, Strecke, Zeit)

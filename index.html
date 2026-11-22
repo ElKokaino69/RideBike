@@ -73,6 +73,7 @@
       <div class="more-menu" id="more-menu" hidden>
         <button id="btn-legend"><span class="mm-ic"></span><span>Radwege &amp; Trails</span></button>
         <button id="btn-layers"><span class="mm-ic"></span><span>Kartenansicht</span></button>
+        <button id="btn-mybike"><span class="mm-ic"></span><span>Mein Rad &amp; Wartung</span><i class="mm-dot" id="wear-dot" hidden></i></button>
         <button id="btn-offline"><span class="mm-ic"></span><span>Offline-Karten</span></button>
         <button id="btn-trophy"><span class="mm-ic"></span><span>Meilensteine</span></button>
         <button id="btn-rec"><span class="mm-ic rec-core"></span><span id="rec-label">Fahrt aufzeichnen</span></button>
@@ -122,6 +123,7 @@
         </div>
       </div>
     </div>
+    <div id="ebike-card" class="ebike-card" hidden></div>
     <div id="offline-card" class="offline-card" hidden>
       <span class="oc-ic" id="oc-ic"></span>
       <div class="oc-txt">
@@ -133,6 +135,7 @@
     </div>
     <div class="actions">
       <button id="btn-fly" class="btn ghost round-btn" aria-label="3D-Flyover"></button>
+      <button id="btn-video" class="btn ghost round-btn" aria-label="Als 3D-Video teilen"></button>
       <button id="btn-go" class="btn primary"></button>
     </div>
   </section>
@@ -281,6 +284,14 @@
   <div id="fly-bar" class="fly-bar glass" hidden>
     <span class="rec"></span>3D-Flyover
     <button id="fly-stop" class="btn tiny">Beenden</button>
+  </div>
+
+  <div id="vid-overlay" class="vid-overlay" hidden>
+    <div class="vid-card glass">
+      <div class="vid-ring"><svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="19"/><circle id="vid-arc" cx="22" cy="22" r="19"/></svg><span id="vid-pct">0 %</span></div>
+      <div><b>3D-Video wird aufgenommen</b><small>Bildschirm bitte nicht sperren</small></div>
+      <button id="vid-cancel" class="btn tiny ghost">Abbrechen</button>
+    </div>
   </div>
 
   <div id="toast" role="status"></div>

@@ -449,14 +449,17 @@ let flyMarker = null;
 
 export function isFlying() { return !!flyRaf; }
 
-export function startFlyover(onEnd) {
+/** Aktuelle Flyover-Position (für die Video-Aufnahme) */
+export const flyState = { p: null, k: 0, d: 0 };
+
+export function startFlyover(onEnd, opts = {}) {
   const r = route.data;
   if (!r) return;
   stopFlyover();
   const el = document.createElement('div');
   el.className = 'fly-rider';
   flyMarker = new maplibregl.Marker({ element: el }).setLngLat(r.coords[0]).addTo(map);
-  const duration = Math.max(14000, Math.min(48000, (r.total / 1000) * 2600));
+  const duration = opts.duration || Math.max(14000, Math.min(48000, (r.total / 1000) * 2600));
   const t0 = performance.now();
   let brg = bearing(r.coords[0], along(r.coords, r.cum, 300));
   map.jumpTo({ center: r.coords[0], zoom: 15.4, pitch: 64, bearing: brg });
@@ -468,6 +471,7 @@ export function startFlyover(onEnd) {
     const ahead = along(r.coords, r.cum, Math.min(r.total, d + 420));
     if (dist(p, ahead) > 5) brg = lerpAngle(brg, bearing(p, ahead), 0.045);
     flyMarker.setLngLat(p);
+    flyState.p = p; flyState.k = k; flyState.d = d;
     map.jumpTo({ center: p, bearing: brg, pitch: 64, zoom: 15.4 });
     if (k < 1) flyRaf = requestAnimationFrame(tick);
     else { stopFlyover(); onEnd?.(); }

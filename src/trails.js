@@ -180,7 +180,7 @@ export function ingestTrails(data, bbox) {
   rebuild();
 }
 
-async function overpass(query) {
+export async function overpass(query) {
   let lastErr;
   for (const url of OVERPASS) {
     try {
