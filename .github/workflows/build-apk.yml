@@ -7,6 +7,9 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: write
+
 jobs:
   apk:
     runs-on: ubuntu-latest
@@ -49,3 +52,13 @@ jobs:
         with:
           name: RideBike-APK
           path: RideBike-*-debug.apk
+
+      # APK zusätzlich im Branch „apk“ ablegen – direkt im Repo herunterladbar
+      - name: APK im Branch „apk“ veröffentlichen
+        run: |
+          mkdir out && cp RideBike-*-debug.apk out/ && cd out
+          git init -q -b apk
+          git config user.name "RideBike CI"
+          git config user.email "ci@users.noreply.github.com"
+          git add . && git commit -qm "APK ${GITHUB_SHA::7}"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" apk
