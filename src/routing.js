@@ -65,7 +65,7 @@ export async function calcRoute(points) {
 
 async function calcRouteWith(points, profile, params) {
   const lonlats = points.map((p) => `${p[0].toFixed(6)},${p[1].toFixed(6)}`).join('|');
-  const extra = Object.entries(params).map(([k, v]) => `&profile:${k}=${encodeURIComponent(typeof v === 'boolean' ? (v ? 'true' : 'false') : v)}`).join('');
+  const extra = Object.entries(params).map(([k, v]) => `&profile:${k}=${encodeURIComponent(typeof v === 'boolean' ? (v ? 1 : 0) : v)}`).join('');
   const url = `${BROUTER}?lonlats=${lonlats}&profile=${encodeURIComponent(profile)}&alternativeidx=0&format=geojson&timode=2${extra}`;
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), 30000);

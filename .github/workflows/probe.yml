@@ -5,6 +5,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          B='https://brouter.de/brouter?lonlats=10.005000,50.402000|9.979986,50.370069&alternativeidx=0&format=geojson'
-          for q in "&profile=trekking&timode=2" "&profile=trekking" "&profile=trekking&timode=2&profile:totalMass=96&profile:maxSpeed=45&profile:C_r=0.0077&profile:S_C_x=0.45&profile:bikerPower=110&profile:avoid_unsafe=true&profile:stick_to_cycleroutes=true&profile:consider_elevation=true&profile:allow_steps=false"; do
-            echo "== $q"; curl -s -w '\nHTTP %{http_code}\n' "$B$q" | head -c 400; echo; done
+          B='https://brouter.de/brouter?lonlats=10.005000,50.402000|9.979986,50.370069&alternativeidx=0&format=geojson&profile=trekking&timode=2'
+          for q in "&profile:totalMass=96" "&profile:maxSpeed=45" "&profile:C_r=0.0077" "&profile:S_C_x=0.45" "&profile:bikerPower=110" "&profile:avoid_unsafe=1" "&profile:stick_to_cycleroutes=1" "&profile:consider_elevation=1" "&profile:allow_steps=0" "&profile:avoid_unsafe=true" "&profile:uphillcost=80" \
+            "&profile:totalMass=96&profile:maxSpeed=45&profile:C_r=0.0077&profile:S_C_x=0.45&profile:bikerPower=110&profile:avoid_unsafe=1&profile:stick_to_cycleroutes=1&profile:consider_elevation=1&profile:allow_steps=0"; do
+            echo "== $q => $(curl -s -o /tmp/o -w '%{http_code}' "$B$q") $(head -c 120 /tmp/o | tr '\n' ' ')"; done
+          G='https://brouter.de/brouter?lonlats=10.005000,50.402000|9.979986,50.370069&alternativeidx=0&format=geojson&profile=gravel&timode=2'
+          echo "== gravel => $(curl -s -o /tmp/o -w '%{http_code}' "$G&profile:prefer_unpaved_paths=1&profile:consider_elevation=1") $(head -c 120 /tmp/o | tr '\n' ' ')"
+          echo "== fastbike => $(curl -s -o /tmp/o -w '%{http_code}' "${G/gravel/fastbike}&profile:consider_traffic=1&profile:allow_steps=0") $(head -c 120 /tmp/o | tr '\n' ' ')"
+          echo "== mtb => $(curl -s -o /tmp/o -w '%{http_code}' "${G/gravel/mtb}") $(head -c 120 /tmp/o | tr '\n' ' ')"
