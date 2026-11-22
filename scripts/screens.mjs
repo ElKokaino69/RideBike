@@ -64,12 +64,17 @@ for (const x of VIEWS.filter((x) => !process.env.ONLY || process.env.ONLY.split(
 if (!process.env.ONLY) {
 // Route planen am echten Gelände: Bischofsheim → Kreuzberg
 try {
-  await view('09-route-kreuzberg', { center: [9.99, 50.36], zoom: 12.6, pitch: 62, bearing: 20 },
+  await view('10-route-3d', { center: [9.99, 50.36], zoom: 12.6, pitch: 62, bearing: 20 },
     { daylightMode: 'noon', geo: { latitude: 50.4020, longitude: 10.0050, accuracy: 8 } }, async (page) => {
       await page.click('#q'); await page.type('#q', 'Kreuzberg Rhön', { delay: 40 });
       await page.waitForSelector('.result:not(.wish)', { timeout: 60000 }); await wait(800);
       await page.click('.result:not(.wish)');
       await page.waitForFunction(() => window.__rb?.route?.data, { timeout: 90000 }).catch(() => {});
+      await settle(page, 60000);
+      await page.screenshot({ path: `${OUT}/09-route-kreuzberg.jpg`, type: 'jpeg', quality: 86 });
+      await page.evaluate(() => window.__rb.closeSheet('sheet-route'));
+      await page.evaluate(() => { const m = window.__rb.map; const r = window.__rb.route.data; if (!r) return;
+        const mid = r.coords[Math.floor(r.coords.length * 0.55)]; m.jumpTo({ center: [mid[0], mid[1]], zoom: 13.4, pitch: 70, bearing: 200 }); });
       await settle(page, 60000);
       console.log('route', await page.evaluate(() => window.__rb?.route?.data ? Math.round(window.__rb.route.data.total) + ' m' : 'keine'));
     });

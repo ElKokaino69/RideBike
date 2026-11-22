@@ -414,9 +414,14 @@ export function drawElevation(canvas, r, onHover) {
   const km = r.total / 1000;
   const stepKm = km <= 3 ? 0.5 : km <= 8 ? 1 : km <= 20 ? 5 : km <= 60 ? 10 : 25;
   ctx.textAlign = 'center';
+  const endW = ctx.measureText(`${String(+km.toFixed(1)).replace('.', ',')} km`).width;
+  let lastRight = -Infinity;
   for (let k = 0; k <= km + 1e-6; k += stepKm) {
     const x = X(k * 1000);
-    if (x > W - padR - 24 && k > 0) continue;
+    const lw = ctx.measureText(`${String(+k.toFixed(1)).replace('.', ',')} km`).width;
+    const cx = Math.max(padL + 10, x);
+    if (k > 0 && (cx + lw / 2 > W - padR - endW - 8 || cx - lw / 2 < lastRight + 6)) continue;
+    lastRight = cx + lw / 2;
     ctx.fillText(`${String(+k.toFixed(1)).replace('.', ',')} km`, Math.max(padL + 10, x), H - 3);
   }
   ctx.textAlign = 'right';

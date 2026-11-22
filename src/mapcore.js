@@ -430,10 +430,14 @@ function guardTerrainCollision(m) {
     if (alt - maxE < 120 || looming) {
       tries++; busy = true;
       m.easeTo({ pitch: Math.max(48, m.getPitch() - 5), zoom: m.getZoom() - 0.35, duration: 500 });
-      m.once('moveend', () => { busy = false; setTimeout(check, 60); });
+      m.once('moveend', () => { busy = false; setTimeout(check, 400); });
     }
   };
-  m.on('moveend', check);
+  // Die Karte wird durch Animationen selten "idle" → nach jeder Bewegung mehrfach nachprüfen,
+  // weil die Höhendaten erst nach und nach geladen werden
+  let timers = [];
+  const schedule = () => { timers.forEach(clearTimeout); timers = [300, 1500, 4000, 8000, 14000].map((t) => setTimeout(check, t)); };
+  m.on('moveend', (e) => { if (!busy) schedule(); });
   m.on('idle', check);
 }
 
