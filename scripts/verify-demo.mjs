@@ -1,0 +1,21 @@
+// Prüft die Demo-HTML ohne Internet (alle externen Anfragen werden blockiert)
+import puppeteer from 'puppeteer';
+const file = 'file://' + process.cwd() + '/RideBike-Demo.html';
+const b = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+const p = await b.newPage();
+await p.setViewport({ width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+await p.setRequestInterception(true);
+let blocked = 0;
+p.on('request', (r) => { if (/^https?:/.test(r.url()) && !/fonts\.g/.test(r.url())) { blocked++; r.abort(); } else r.continue(); });
+p.on('pageerror', (e) => console.log('PAGEERR', e.message));
+await p.goto(file, { waitUntil: 'domcontentloaded' });
+await new Promise((r) => setTimeout(r, 30000));
+await p.screenshot({ path: 'demo-1-start.jpg', type: 'jpeg', quality: 85 });
+await p.click('#q'); await p.keyboard.type('Kreuzberg', { delay: 150 });
+await p.waitForSelector('.result:not(.wish)', { timeout: 20000 }).catch(() => console.log('keine Suchergebnisse'));
+await new Promise((r) => setTimeout(r, 1000));
+await p.click('.result:not(.wish)').catch(() => {});
+await new Promise((r) => setTimeout(r, 20000));
+await p.screenshot({ path: 'demo-2-route.jpg', type: 'jpeg', quality: 85 });
+console.log('blockierte Netzanfragen', blocked, 'Route', await p.evaluate(() => document.querySelector('#rp-stats, .rp-stats, .stats')?.textContent?.slice(0, 80) || '?'));
+await b.close();

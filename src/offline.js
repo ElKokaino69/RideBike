@@ -1,3 +1,4 @@
+import { DEMO, demoGet } from './demo.js';
 // RideBike – Offline-Karten
 // Kachel-Cache in IndexedDB, eigenes Kartenprotokoll "rbc://", Download für Routenkorridor
 // und Kartenausschnitt, Verwaltung gespeicherter Bereiche und Touren.
@@ -123,6 +124,7 @@ export function setupProtocol() {
   protocolReady = true;
   maplibregl.addProtocol('rbc', async (params, ac) => {
     const url = params.url.replace(/^rbc:\/\//, '');
+    if (DEMO) { const d = demoGet(url); if (d) return { data: decode(d, params.type) }; }
     const key = tileKey(url);
     const tile = isTileKey(key);
     const hit = await idbGet(tile ? 'tiles' : 'meta', key);

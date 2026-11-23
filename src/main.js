@@ -35,6 +35,7 @@ import { routeWeather, bestStart, wmo, compass, windAt } from './weather.js';
 import { SURF, WAYS, climbSvg, gradeColor, toGpx, parseGpx } from './analysis.js';
 import { splitStages, findStays } from './stages.js';
 import { wikiSummary } from './wiki.js';
+import { installDemo, DEMO, DEMO_INFO } from './demo.js';
 import { routeFromCoords } from './routing.js';
 import { sunPosition } from './details.js';
 import { parseWish, wishLabel, generateLoop } from './tourwish.js';
@@ -59,11 +60,15 @@ const isNative = Capacitor.isNativePlatform();
 // Start
 // =====================================================================
 async function boot() {
+  installDemo();
+  // Startbild verschwindet spätestens nach 8 s – auch wenn etwas hängt
+  setTimeout(() => { const sp = document.getElementById('splash'); if (sp && !sp.classList.contains('hide')) { sp.classList.add('hide'); setTimeout(() => sp.remove(), 900); } }, 8000);
   if (isNative) document.documentElement.classList.add('native');
   // Die App-Oberfläche darf nie als Ganzes scrollen (z. B. durch Fokus/scrollIntoView)
   const pin = (el) => el.addEventListener('scroll', () => { if (el.scrollTop || el.scrollLeft) { el.scrollTop = 0; el.scrollLeft = 0; } });
   pin(document.body); pin(document.documentElement); window.addEventListener('scroll', () => window.scrollTo(0, 0));
   await loadSettings();
+  if (DEMO) { settings.style = 'satellite'; settings.quality = 'balanced'; settings.offlinePrompt = false; if (!settings.lastView) settings.lastView = null; }
   await loadStats();
   await loadWear();
   await loadPhotos();
@@ -119,6 +124,7 @@ async function boot() {
   const t0 = Date.now();
   map.once('load', () => setTimeout(hideSplash, Math.max(0, 1700 - (Date.now() - t0))));
   setTimeout(hideSplash, 5000);
+  if (DEMO) { const b = document.createElement('div'); b.className = 'demo-badge'; b.textContent = `Demo ohne Internet · ${DEMO_INFO?.area || 'Rhön'}`; document.body.appendChild(b); setTimeout(() => toast('Demo-Vorschau: Kartendaten der Rhön sind eingebettet – Route „Kreuzberg“ suchen'), 2500); }
   if (isNative) SplashScreen.hide().catch(() => {});
 
   map.on('moveend', debounce(() => {
@@ -2967,4 +2973,12 @@ function wireBackButton() {
   });
 }
 
-boot();
+boot().catch((e) => {
+  // Start fehlgeschlagen (z. B. Vorschau ohne Internet): Startbild ausblenden und verständlich erklären
+  console.error('Start fehlgeschlagen', e);
+  const sp = document.getElementById('splash'); if (sp) { sp.classList.add('hide'); setTimeout(() => sp.remove(), 900); }
+  const box = document.createElement('div');
+  box.className = 'boot-fail';
+  box.innerHTML = `<b>Karte konnte nicht geladen werden</b><p>RideBike braucht Internet für Karten und Gelände. Diese Vorschau blockiert den Zugriff vermutlich. Lade die Datei herunter und öffne sie in Chrome oder Edge – oder nutze die App.</p><small>${String(e?.message || e).replace(/</g, '&lt;')}</small>`;
+  document.body.appendChild(box);
+});

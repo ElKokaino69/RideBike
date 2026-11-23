@@ -1,0 +1,29 @@
+name: RideBike Demo-Vorschau (offline)
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: 22 }
+      - run: npm ci
+      - run: npm run build && npm run build:single
+      - run: npx vite preview --port 4173 --strictPort &
+      - run: npm i --no-save puppeteer@24
+      - name: Echte Daten aufzeichnen
+        run: sleep 4 && node scripts/record-demo.mjs
+      - run: node scripts/build-demo.mjs dist-single/RideBike-App.html demo-pack.json RideBike-Demo.html
+      - name: Ohne Internet prüfen
+        run: node scripts/verify-demo.mjs
+      - name: In Branch "demo" ablegen
+        run: |
+          mkdir out && mv RideBike-Demo.html demo-*.jpg out/ && cd out
+          git init -q && git checkout -q -b demo
+          git config user.name "RideBike Bot" && git config user.email "bot@users.noreply.github.com"
+          git add -A && git commit -qm "Demo ${GITHUB_SHA::7}"
+          git push -qf "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" demo
