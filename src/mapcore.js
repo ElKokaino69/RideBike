@@ -101,10 +101,11 @@ export async function createMap(container, view) {
     style,
     pixelRatio: pixelRatio(),
     maxTileCacheZoomLevels: quality().cacheZoomLevels,
-    center: view?.center || [10.45, 51.16],
-    zoom: view?.zoom ?? 5.2,
-    pitch: view?.pitch ?? 0,
-    bearing: view?.bearing ?? 0,
+    // Erster Start ohne Standort: gleich in 3D über der Rhön (Kreuzberg) statt flacher Deutschlandkarte
+    center: view?.center || [9.9660, 50.3580],
+    zoom: view?.zoom ?? 13.2,
+    pitch: view?.pitch ?? 68,
+    bearing: view?.bearing ?? 40,
     maxPitch: quality().maxPitch,
     anisotropicFilterPitch: 8,   // Luftbild schon bei leichter Neigung scharf filtern
     attributionControl: { compact: true },
