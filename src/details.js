@@ -5,6 +5,7 @@
 
 import maplibregl from 'maplibre-gl';
 import mlcontour from 'maplibre-contour';
+import { DEMO } from './demo.js';
 import { DEM } from './config.js';
 import { settings } from './settings.js';
 import { effExaggeration, map, onStyleReady, labelAnchor, isDarkStyle, registerDaylight, currentStyleDef, activeStyleId, switchStyle } from './mapcore.js';
@@ -18,7 +19,7 @@ const demSource = new mlcontour.DemSource({
   url: DEM.tiles[0],
   encoding: 'terrarium',
   maxzoom: 13,
-  worker: true,
+  worker: !DEMO,   // Demo: im Hauptthread laden, damit die eingebetteten Daten greifen
   cacheSize: 120,
   timeoutMs: 12000
 });

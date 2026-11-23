@@ -157,7 +157,7 @@ async function boot() {
   onLocation(() => {
     if (!firstFix) return;
     firstFix = false;
-    if (!settings.lastView || followMode) {
+    if ((!settings.lastView && !DEMO) || followMode) {
       flyToUser(true);
     }
   });

@@ -46,10 +46,12 @@ await cam({ zoom: 14.3, pitch: 70 }); await settle();
 await cam(VIEW); await settle();
 // Route: Bischofsheim → Kreuzberg
 await step('route', async () => {
-await page.click('#q');
+await page.evaluate(() => document.querySelectorAll('.sheet.open').forEach((x) => window.__rb.closeSheet(x.id)));
+await page.evaluate(() => { const q = document.querySelector('#q'); q.scrollIntoView(); q.focus(); q.click(); });
+await wait(600);
 for (const ch of 'Kreuzberg') { await page.keyboard.type(ch); await wait(450); }
 await page.waitForSelector('.result:not(.wish)', { timeout: 60000 }); await wait(1500);
-await page.click('.result:not(.wish)');
+await page.evaluate(() => document.querySelector('.result:not(.wish)').click());
 await page.waitForFunction(() => window.__rb?.route?.data, { timeout: 90000 }).catch(() => console.log('keine Route'));
 await settle(); await wait(15000); // Wetter, Analyse, Orte entlang der Route
 console.log('Route', await page.evaluate(() => window.__rb.route.data ? Math.round(window.__rb.route.data.total) : 0));

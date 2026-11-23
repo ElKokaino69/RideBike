@@ -6,6 +6,7 @@ import { MAP_STYLES, OFM_GLYPHS, OFM_VECTOR, DEM, DEM_HD, WAYMARKED, C } from '.
 import { settings } from './settings.js';
 import { quality, qualityId, pixelRatio, animationsActive, applyLod } from './graphics.js';
 import { setupProtocol, prepareStyle, viaCache, mapNetAllowed } from './offline.js';
+import { DEMO, demoGet } from './demo.js';
 
 export let map = null;
 const styleHooks = [];
@@ -164,6 +165,17 @@ export function labelAnchor(m = map) {
 let demHd = false;
 export const isHdTerrain = () => demHd;
 
+// Demo-Vorschau: HD-Gelände über das Kachel-Protokoll aus dem eingebetteten Paket
+function hdDemSpec() {
+  if (DEMO) {
+    try {
+      const tj = JSON.parse(new TextDecoder().decode(demoGet(DEM_HD.url)));
+      return { type: 'raster-dem', tiles: tj.tiles.map(viaCache), minzoom: tj.minzoom ?? 0, maxzoom: tj.maxzoom ?? 14, encoding: 'terrarium', tileSize: 512, attribution: DEM_HD.attribution };
+    } catch { /* Standardmodell */ }
+  }
+  return { type: 'raster-dem', url: DEM_HD.url, encoding: 'terrarium', tileSize: 512, attribution: DEM_HD.attribution };
+}
+
 function useHdTerrain() {
   return settings.hdTerrain !== false && mapNetAllowed() && qualityId() !== 'saver';
 }
@@ -185,7 +197,7 @@ export function swapDem(m = map, hd = useHdTerrain()) {
   if (!m || !m.getSource('rb-dem') || hd === demHd) return;
   demHd = hd;
   const dem = hd
-    ? { type: 'raster-dem', url: DEM_HD.url, encoding: 'terrarium', tileSize: 512, attribution: DEM_HD.attribution }
+    ? hdDemSpec()
     : { type: 'raster-dem', ...DEM, tiles: DEM.tiles.map(viaCache) };
   m.setTerrain(null);
   const hsLayer = m.getStyle().layers.find((l) => l.id === 'rb-hillshade');
@@ -208,7 +220,7 @@ function addBaseExtras(m) {
   const hd = useHdTerrain();
   demHd = hd;
   const dem = hd
-    ? { type: 'raster-dem', url: DEM_HD.url, encoding: 'terrarium', tileSize: 512, attribution: DEM_HD.attribution }
+    ? hdDemSpec()
     : { type: 'raster-dem', ...DEM, tiles: DEM.tiles.map(viaCache) };
   if (!m.getSource('rb-dem')) m.addSource('rb-dem', dem);
   if (!m.getSource('rb-dem-hs')) m.addSource('rb-dem-hs', { ...dem });
