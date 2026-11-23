@@ -1,3 +1,4 @@
+import { prepareWorkers } from './workers.js';
 // RideBike – Hauptmodul
 // © 2026 Florian Enders. Alle Rechte vorbehalten.
 
@@ -74,6 +75,7 @@ async function boot() {
   await loadPhotos();
   stats.photo = photoStats();
   await initNetwork();
+  await prepareWorkers(maplibregl);
   await createMap('map', settings.lastView);
   initTrails();
   initRouting();
